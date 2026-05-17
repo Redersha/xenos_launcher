@@ -34,14 +34,18 @@ function getArch() { return process.arch; }
 function getPlatform() { return process.platform; }
 
 function getExeName(p) {
-  const isWin = p.startsWith('win') || (p === 'current' && getPlatform() === 'win32');
+  const currentOs = getPlatform();
+  const currentArch = getArch();
+  const isWin = p.startsWith('win') || (p === 'current' && currentOs === 'win32');
   const ext = isWin ? '.exe' : '';
+  const osName = currentOs === 'darwin' ? 'macos' : currentOs === 'win32' ? 'windows' : 'linux';
+  const archName = currentArch === 'x64' ? 'x64' : currentArch;
   const names = {
-    'macos-arm64': `xl-macos-arm64${ext}`,
-    'macos-x64': `xl-macos-x64${ext}`,
-    'win-x64': `xl-win-x64${ext}`,
-    'linux-x64': `xl-linux-x64${ext}`,
-    'current': `xl-${getPlatform()}-${getArch()}${ext}`,
+    'macos-arm64': `xenos-launcher-macos-arm64${ext}`,
+    'macos-x64': `xenos-launcher-macos-x64${ext}`,
+    'win-x64': `xenos-launcher-windows-x64${ext}`,
+    'linux-x64': `xenos-launcher-linux-x64${ext}`,
+    'current': `xenos-launcher-${osName}-${archName}${ext}`,
   };
   return names[p] || names['current'];
 }
