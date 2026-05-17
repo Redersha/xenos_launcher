@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { GameInstance, InstanceConfig } from '../types/instance.js';
-import { getInstanceDir, PATHS } from '../store/paths.js';
+import { getInstanceDir, getInstanceGameDir, PATHS } from '../store/paths.js';
 import { loadInstances, saveInstances, loadInstanceConfig, saveInstanceConfig } from '../store/config.js';
 
 export function createInstance(opts: {
@@ -13,11 +13,15 @@ export function createInstance(opts: {
   resolution?: { width: number; height: number };
 }): GameInstance {
   const id = `instance_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-  const gameDir = getInstanceDir(id);
+  const gameDir = getInstanceGameDir(id);
 
-  // Ensure instance directory exists
-  if (!fs.existsSync(gameDir)) {
-    fs.mkdirSync(gameDir, { recursive: true });
+  // Ensure instance directory and standard Minecraft subdirectories exist
+  const subdirs = ['saves', 'resourcepacks', 'shaderpacks', 'mods', 'config'];
+  for (const sub of subdirs) {
+    const dir = path.join(gameDir, sub);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
   }
 
   const instance: GameInstance = {
@@ -48,13 +52,25 @@ export function createInstance(opts: {
   return instance;
 }
 
+// Undo-delete support: store the last deleted instance for one-level undo
+let lastDeletedInstance: GameInstance | null = null;
+let lastDeletedConfig: InstanceConfig | null = null;
+
 export function deleteInstance(instanceId: string): boolean {
   const instances = loadInstances();
   const idx = instances.findIndex(i => i.id === instanceId);
   if (idx === -1) return false;
 
-  instances.splice(idx, 1);
+  const removed = instances.splice(idx, 1)[0];
   saveInstances(instances);
+
+  // Save for undo
+  lastDeletedInstance = removed;
+  try {
+    lastDeletedConfig = loadInstanceConfig(instanceId);
+  } catch {
+    lastDeletedConfig = null;
+  }
 
   // Optionally remove instance directory
   const dir = getInstanceDir(instanceId);
@@ -63,6 +79,43 @@ export function deleteInstance(instanceId: string): boolean {
   }
 
   return true;
+}
+
+export function undoDeleteInstance(): GameInstance | null {
+  if (!lastDeletedInstance) return null;
+
+  const instance = lastDeletedInstance;
+  const config = lastDeletedConfig;
+
+  // Restore instance directory
+  const gameDir = instance.gameDir;
+  if (!fs.existsSync(gameDir)) {
+    fs.mkdirSync(gameDir, { recursive: true });
+    const subdirs = ['saves', 'resourcepacks', 'shaderpacks', 'mods', 'config'];
+    for (const sub of subdirs) {
+      const dir = path.join(gameDir, sub);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    }
+  }
+
+  // Re-add to instances list
+  const instances = loadInstances();
+  if (!instances.find(i => i.id === instance.id)) {
+    instances.push(instance);
+    saveInstances(instances);
+  }
+
+  // Restore config
+  if (config) {
+    saveInstanceConfig(config);
+  }
+
+  lastDeletedInstance = null;
+  lastDeletedConfig = null;
+
+  return instance;
 }
 
 export function updateInstance(instanceId: string, updates: Partial<GameInstance>): GameInstance | null {
@@ -104,7 +157,7 @@ export function importInstance(opts: {
   const id = `instance_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const instanceDir = getInstanceDir(id);
 
-  // Ensure instance directory exists
+  // Ensure instance base directory exists
   if (!fs.existsSync(instanceDir)) {
     fs.mkdirSync(instanceDir, { recursive: true });
   }

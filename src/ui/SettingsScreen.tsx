@@ -127,6 +127,7 @@ const SettingsScreen: React.FC<Props> = ({ state, onBack, onLanguageChange }) =>
   return (
     <Box flexDirection="column">
       <Text color="cyan" bold>{t('settings.title', lang)}</Text>
+      <Text color="green">{t('common.navHint', lang)}</Text>
       <Box marginTop={1} flexDirection="column">
         {settings.map((item, idx) => (
           <Box key={item.key} marginBottom={1}>

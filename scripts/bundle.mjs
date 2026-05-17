@@ -24,7 +24,7 @@ await build({
   bundle: true,
   platform: 'node',
   target: 'node20',
-  outfile: join(ROOT, 'dist-bundle', 'tcl.js'),
+  outfile: join(ROOT, 'dist-bundle', 'xl.js'),
   format: 'esm',
   alias: { 'react-devtools-core': './shims/react-devtools-core.js' },
   packages: 'bundle',

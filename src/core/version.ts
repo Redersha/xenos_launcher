@@ -1,3 +1,4 @@
+
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -77,7 +78,7 @@ export async function getAvailableVersions(filter?: {
   maxVersion?: string;
 }): Promise<VersionEntry[]> {
   const manifest = await getVersionManifest();
-  let versions = manifest.versions;
+  let versions = manifest.versions.filter(v => v.type !== 'old_alpha' && v.type !== 'old_beta');
 
   if (filter?.type && filter.type !== 'all') {
     versions = versions.filter(v => v.type === filter.type);

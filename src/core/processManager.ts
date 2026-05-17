@@ -105,6 +105,45 @@ class ProcessManager {
     return killed;
   }
 
+  killAll(): number {
+    const games = this.list();
+    let killed = 0;
+    for (const game of games) {
+      if (this.killByPid(game.pid)) killed++;
+    }
+    return killed;
+  }
+
+  /** Kill all processes except the one belonging to the most recently launched instance */
+  killAllBesidesLast(): number {
+    const games = this.list();
+    if (games.length === 0) return 0;
+
+    // Find the most recently started game
+    const sorted = [...games].sort((a, b) => b.startTime - a.startTime);
+    const lastGame = sorted[0];
+
+    let killed = 0;
+    for (const game of games) {
+      if (game.pid !== lastGame.pid) {
+        if (this.killByPid(game.pid)) killed++;
+      }
+    }
+    return killed;
+  }
+
+  /** Kill all processes except those belonging to the named instance */
+  killAllBesidesInstance(instanceName: string): number {
+    const games = this.list();
+    let killed = 0;
+    for (const game of games) {
+      if (game.instanceName !== instanceName) {
+        if (this.killByPid(game.pid)) killed++;
+      }
+    }
+    return killed;
+  }
+
   getRunningCount(): number {
     return this.list().length;
   }

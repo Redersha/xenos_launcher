@@ -6,26 +6,31 @@ import { deleteInstance, listInstances, createInstance, importInstance, detectVe
 import { getRecommendedJavaVersion } from '../java/versions.js';
 import { t } from '../i18n/index.js';
 import * as path from 'path';
+import * as child_process from 'child_process';
 
 interface Props {
   state: AppState;
   onBack: () => void;
   onLaunch: (instanceId: string, accountId: string) => void;
+  pendingCreateVersion?: string;
+  pendingCreateName?: string;
+  onSelectVersion?: (draftName?: string) => void;
 }
 
 type SubScreen = 'list' | 'create' | 'detail' | 'select-account' | 'import' | 'import-select-version';
 
-const InstanceManager: React.FC<Props> = ({ state, onBack, onLaunch }) => {
+const InstanceManager: React.FC<Props> = ({ state, onBack, onLaunch, pendingCreateVersion, pendingCreateName, onSelectVersion }) => {
   const [selected, setSelected] = useState(0);
   const [instances, setInstances] = useState(state.instances);
-  const [subScreen, setSubScreen] = useState<SubScreen>('list');
-  const [createName, setCreateName] = useState('');
-  const [createVersion, setCreateVersion] = useState('1.21.4');
+  const [subScreen, setSubScreen] = useState<SubScreen>(pendingCreateVersion ? 'create' : 'list');
+  const [createName, setCreateName] = useState(pendingCreateName || '');
+  const [createVersion, setCreateVersion] = useState(pendingCreateVersion || '1.21.4');
   const [selectedAccountId, setSelectedAccountId] = useState(state.accounts[0]?.id || '');
   const [status, setStatus] = useState('');
   const [importPath, setImportPath] = useState('');
   const [importVersions, setImportVersions] = useState<string[]>([]);
   const [importSelectedVersion, setImportSelectedVersion] = useState(0);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const lang = state.config.language || 'zh-CN';
 
@@ -43,14 +48,28 @@ const InstanceManager: React.FC<Props> = ({ state, onBack, onLaunch }) => {
         setSubScreen('select-account');
         setSelectedAccountId(state.accounts[0]?.id || '');
       } else if (input === 'n') {
-        setSubScreen('create');
-        setCreateName('');
+        if (onSelectVersion) {
+          onSelectVersion();
+        } else {
+          setSubScreen('create');
+          setCreateName('');
+        }
       } else if (input === 'i') {
         setSubScreen('import');
         setImportPath('');
         setImportVersions([]);
         setStatus('');
-      } else if (input === 'd' && instances.length > 0) {
+      } else if (input === 'f' && instances.length > 0) {
+        const inst = instances[selected];
+        if (inst) {
+          const dir = inst.gameDir;
+          const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
+          child_process.exec(`${cmd} "${dir}"`);
+          setStatus(`${t('instances.openFolder', lang)}: ${dir}`);
+        }
+      } else if (input === 'd' && instances.length > 0 && !confirmDelete) {
+        setConfirmDelete(true);
+      } else if (confirmDelete && (input === 'y' || input === 'Y')) {
         const inst = instances[selected];
         if (inst) {
           deleteInstance(inst.id);
@@ -58,11 +77,22 @@ const InstanceManager: React.FC<Props> = ({ state, onBack, onLaunch }) => {
           setSelected(0);
           setStatus(`${t('instances.deleted', lang)}: ${inst.name}`);
         }
+        setConfirmDelete(false);
+      } else if (confirmDelete && (input === 'n' || input === 'N' || key.escape)) {
+        setConfirmDelete(false);
       }
     } else if (subScreen === 'create') {
       if (key.escape) {
         setSubScreen('list');
         return;
+      }
+      if (subScreen === 'create') {
+        if (input === 'v' && !key.ctrl && !key.meta && createName.trim() === '') {
+          if (onSelectVersion) {
+            onSelectVersion();
+          }
+          return;
+        }
       }
       if (key.return && createName.trim()) {
         try {
@@ -151,6 +181,7 @@ const InstanceManager: React.FC<Props> = ({ state, onBack, onLaunch }) => {
     return (
       <Box flexDirection="column">
         <Text color="cyan" bold>{t('instances.new', lang)}</Text>
+        <Text color="green">{t('common.navHint', lang)}</Text>
         <Box marginTop={1}>
           <Text color="white">{t('instances.name', lang)}: </Text>
           <Text color="green">{createName}<Text color="gray">▎</Text></Text>
@@ -158,6 +189,7 @@ const InstanceManager: React.FC<Props> = ({ state, onBack, onLaunch }) => {
         <Box>
           <Text color="white">{t('instances.version', lang)}: </Text>
           <Text color="yellow">{createVersion}</Text>
+          <Text color="gray"> (v){t('instances.selectVersion', lang)}</Text>
         </Box>
         <Box marginTop={1}>
           <Text color="gray">Press Enter to create, Esc to cancel</Text>
@@ -172,6 +204,7 @@ const InstanceManager: React.FC<Props> = ({ state, onBack, onLaunch }) => {
     return (
       <Box flexDirection="column">
         <Text color="cyan" bold>{t('instances.selectAccount', lang)}: {inst?.name}</Text>
+        <Text color="green">{t('common.navHint', lang)}</Text>
         <Box marginTop={1} flexDirection="column">
           {state.accounts.length === 0 ? (
             <Text color="yellow">{t('instances.noAccount', lang)}</Text>
@@ -199,6 +232,7 @@ const InstanceManager: React.FC<Props> = ({ state, onBack, onLaunch }) => {
     return (
       <Box flexDirection="column">
         <Text color="cyan" bold>{t('instances.importTitle', lang)}</Text>
+        <Text color="green">{t('common.navHint', lang)}</Text>
         <Box marginTop={1}>
           <Text color="white">Path: </Text>
           <Text color="green">{importPath}<Text color="gray">▎</Text></Text>
@@ -218,6 +252,7 @@ const InstanceManager: React.FC<Props> = ({ state, onBack, onLaunch }) => {
     return (
       <Box flexDirection="column">
         <Text color="cyan" bold>{t('instances.importSelectVersion', lang)}</Text>
+        <Text color="green">{t('common.navHint', lang)}</Text>
         <Box marginTop={1} flexDirection="column">
           {importVersions.map((ver, idx) => (
             <Box key={ver}>
@@ -238,6 +273,7 @@ const InstanceManager: React.FC<Props> = ({ state, onBack, onLaunch }) => {
   return (
     <Box flexDirection="column">
       <Text color="cyan" bold>{t('instances.title', lang)}</Text>
+      <Text color="green">{t('common.navHint', lang)}</Text>
       <Box marginTop={1} flexDirection="column">
         {instances.length === 0 ? (
           <Box flexDirection="column">
@@ -257,11 +293,13 @@ const InstanceManager: React.FC<Props> = ({ state, onBack, onLaunch }) => {
                 >
                   {inst.name}
                 </Text>
+                <Text color="gray"> — </Text>
+                <Text color="green">{inst.versionId}</Text>
+                <Text color="gray"> | </Text>
+                <Text color="yellow">JDK {getRecommendedJavaVersion(inst.versionId)}</Text>
               </Box>
               {idx === selected && (
                 <Box marginLeft={4} flexDirection="column">
-                  <Text color="gray">{t('instances.versionLabel', lang)}: <Text color="green">{inst.versionId}</Text></Text>
-                  <Text color="gray">Java: <Text color="yellow">JDK {getRecommendedJavaVersion(inst.versionId)}</Text></Text>
                   <Text color="gray">{t('instances.dirLabel', lang)}: <Text color="blue">{inst.gameDir}</Text></Text>
                 </Box>
               )}
@@ -272,6 +310,9 @@ const InstanceManager: React.FC<Props> = ({ state, onBack, onLaunch }) => {
       <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={1}>
         <Text color="gray">{t('instances.actions', lang)}</Text>
       </Box>
+      {confirmDelete && (
+        <Text color="yellow">{t('instances.confirmDelete', lang)}</Text>
+      )}
       {status && <Text color="green">{status}</Text>}
     </Box>
   );

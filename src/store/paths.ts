@@ -8,11 +8,11 @@ function getBaseDir(): string {
   const home = os.homedir();
   switch (platform) {
     case 'win32':
-      return path.join(home, 'AppData', 'Roaming', '.terminal-craft-launcher');
+      return path.join(home, 'AppData', 'Roaming', '.xenos-launcher');
     case 'darwin':
-      return path.join(home, 'Library', 'Application Support', 'terminal-craft-launcher');
+      return path.join(home, 'Library', 'Application Support', 'xenos-launcher');
     default:
-      return path.join(home, '.terminal-craft-launcher');
+      return path.join(home, '.xenos-launcher');
   }
 }
 
@@ -87,6 +87,11 @@ export function getLibraryPath(libPath: string): string {
 
 export function getInstanceDir(instanceId: string): string {
   return path.join(PATHS.instances, instanceId);
+}
+
+/** Per-instance game directory (the .minecraft equivalent with saves, resourcepacks, etc.) */
+export function getInstanceGameDir(instanceId: string): string {
+  return path.join(PATHS.instances, instanceId, '.minecraft');
 }
 
 export function getJavaInstallDir(distribution: string, version: number): string {

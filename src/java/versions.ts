@@ -61,6 +61,11 @@ function normalizeVersion(v: string): number[] {
   if (snapMatch) {
     return [2000 + parseInt(snapMatch[1]), parseInt(snapMatch[2])];
   }
+  // Pre-classic / classic / old_alpha versions (rd-*, c0.*, a0.*, b0.*)
+  // These are very old versions that need Java 8
+  if (/^(rd-|c0\.|a0\.|b0\.|inf-|in-)/.test(v)) {
+    return [0, 0];
+  }
   return [0];
 }
 

@@ -95,6 +95,7 @@ const VersionSelector: React.FC<Props> = ({ state, onBack, onSelect }) => {
   return (
     <Box flexDirection="column">
       <Text color="cyan" bold>{t('versions.title', lang)}</Text>
+      <Text color="green">{t('common.navHint', lang)}</Text>
       <Box marginBottom={1}>
         <Text color={filter === 'release' ? 'green' : 'gray'}>[r]Release </Text>
         <Text color={filter === 'snapshot' ? 'green' : 'gray'}>[s]Snapshot </Text>

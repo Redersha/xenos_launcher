@@ -128,6 +128,7 @@ const AccountManager: React.FC<Props> = ({ state, onBack }) => {
     return (
       <Box flexDirection="column">
         <Text color="cyan" bold>{t('accounts.addOffline', lang)}</Text>
+        <Text color="green">{t('common.navHint', lang)}</Text>
         <Box marginTop={1}>
           <Text color="white">{t('accounts.username', lang)}: </Text>
           <Text color="green">{offlineName}<Text color="gray">▎</Text></Text>
@@ -143,6 +144,7 @@ const AccountManager: React.FC<Props> = ({ state, onBack }) => {
     return (
       <Box flexDirection="column">
         <Text color="cyan" bold>{t('accounts.addMicrosoft', lang)}</Text>
+        <Text color="green">{t('common.navHint', lang)}</Text>
         <Box marginTop={1}>
           {msStatus === 'waiting' && (
             <Box flexDirection="column">
@@ -177,6 +179,7 @@ const AccountManager: React.FC<Props> = ({ state, onBack }) => {
     return (
       <Box flexDirection="column">
         <Text color="cyan" bold>{t('accounts.addYggdrasil', lang)}</Text>
+        <Text color="green">{t('common.navHint', lang)}</Text>
         <Box marginTop={1}>
           <Text color="white">Server: </Text>
           <Text color="yellow">{server?.name || 'Custom'}</Text>
@@ -204,6 +207,7 @@ const AccountManager: React.FC<Props> = ({ state, onBack }) => {
   return (
     <Box flexDirection="column">
       <Text color="cyan" bold>{t('accounts.title', lang)}</Text>
+      <Text color="green">{t('common.navHint', lang)}</Text>
       <Box marginTop={1} flexDirection="column">
         {accounts.length === 0 ? (
           <Text color="yellow">{t('accounts.empty', lang)}</Text>

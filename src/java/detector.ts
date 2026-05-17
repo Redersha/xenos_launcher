@@ -61,6 +61,30 @@ export async function findBestJava(requiredVersion: number): Promise<JavaInstall
   return null;
 }
 
+/**
+ * Delete a managed JDK installation by removing its install directory.
+ * Only works for managed (auto-installed) JDKs under PATHS.java.
+ * Returns true if deleted, false if not a managed JDK or deletion failed.
+ */
+export function deleteManagedJdk(installPath: string): boolean {
+  // Resolve the JDK root dir from the java binary path
+  // e.g. .../java/azul-21/bin/java -> .../java/azul-21
+  const binDir = path.dirname(installPath);
+  const jdkRoot = path.dirname(binDir);
+
+  // Safety: only allow deletion under PATHS.java
+  if (!jdkRoot.startsWith(PATHS.java)) return false;
+
+  try {
+    if (fs.existsSync(jdkRoot)) {
+      fs.rmSync(jdkRoot, { recursive: true, force: true });
+      return true;
+    }
+  } catch { /* ignore */ }
+
+  return false;
+}
+
 async function findJavaInPath(): Promise<JavaInstallation[]> {
   const results: JavaInstallation[] = [];
   const javaNames = os.platform() === 'win32' ? ['java.exe', 'javaw.exe'] : ['java'];

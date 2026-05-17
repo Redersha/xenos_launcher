@@ -1,3 +1,4 @@
+import * as child_process from 'child_process';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -23,37 +24,56 @@ interface LaunchOptions {
   autoRamAllocation?: boolean;
 }
 
-function evaluateRule(rule: Rule): boolean {
+/**
+ * Check if a single rule's OS/arch conditions match the current platform.
+ * A rule with no conditions always matches.
+ */
+function ruleMatches(rule: Rule): boolean {
+  if (!rule.os) return true;
+
   const platform = process.platform;
   const arch = process.arch;
 
-  if (rule.os) {
-    if (rule.os.name) {
-      const osMap: Record<string, string[]> = {
-        windows: ['win32'],
-        osx: ['darwin'],
-        linux: ['linux'],
-      };
-      const match = osMap[rule.os.name]?.includes(platform) ?? false;
-      if (!match) return rule.action === 'disallow';
-    }
-    if (rule.os.arch) {
-      const archMap: Record<string, string> = {
-        x86: 'ia32',
-        x64: 'x64',
-        arm64: 'arm64',
-      };
-      const match = archMap[rule.os.arch] === arch;
-      if (!match) return rule.action === 'disallow';
-    }
+  if (rule.os.name) {
+    const osMap: Record<string, string[]> = {
+      windows: ['win32'],
+      osx: ['darwin'],
+      linux: ['linux'],
+    };
+    const match = osMap[rule.os.name]?.includes(platform) ?? false;
+    if (!match) return false;
   }
 
-  return rule.action === 'allow';
+  if (rule.os.arch) {
+    const archMap: Record<string, string> = {
+      x86: 'ia32',
+      x64: 'x64',
+      arm64: 'arm64',
+    };
+    if (archMap[rule.os.arch] !== arch) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Evaluate whether a library/argument should be applied based on its rules.
+ * Minecraft rule semantics: process rules in order, LAST matching rule wins.
+ * e.g. [allow, disallow(osx)] → disallowed on macOS, allowed elsewhere.
+ */
+function shouldApply(rules: Rule[]): boolean {
+  let result = false; // default: disallow when rules exist
+  for (const rule of rules) {
+    if (ruleMatches(rule)) {
+      result = rule.action === 'allow';
+    }
+  }
+  return result;
 }
 
 function shouldApplyLibrary(lib: Library): boolean {
   if (!lib.rules || lib.rules.length === 0) return true;
-  return lib.rules.some(rule => evaluateRule(rule));
+  return shouldApply(lib.rules);
 }
 
 function getArguments(args: ArgumentEntry[]): string[] {
@@ -62,7 +82,7 @@ function getArguments(args: ArgumentEntry[]): string[] {
     if (typeof arg === 'string') {
       result.push(arg);
     } else if (arg.rules && arg.rules.length > 0) {
-      if (arg.rules.some(rule => evaluateRule(rule))) {
+      if (shouldApply(arg.rules)) {
         if (Array.isArray(arg.value)) {
           result.push(...arg.value);
         } else if (arg.value) {
@@ -143,9 +163,51 @@ async function getLibraryPaths(details: VersionDetail[]): Promise<string[]> {
   return paths;
 }
 
+async function extractNatives(details: VersionDetail[], nativesDir: string): Promise<void> {
+  // Clean and recreate natives directory to avoid stale files from previous runs
+  if (fs.existsSync(nativesDir)) {
+    fs.rmSync(nativesDir, { recursive: true, force: true });
+  }
+  fs.mkdirSync(nativesDir, { recursive: true });
+
+  for (const detail of details) {
+    for (const lib of detail.libraries) {
+      if (!shouldApplyLibrary(lib)) continue;
+
+      const nativeClassifier = getNativeClassifier(lib);
+      if (!nativeClassifier || !lib.downloads?.classifiers?.[nativeClassifier]) continue;
+
+      const nativePath = getLibraryPath(lib.downloads.classifiers[nativeClassifier].path);
+      if (!fileExists(nativePath)) continue;
+
+      const exclude = lib.extract?.exclude || [];
+
+      try {
+        child_process.execSync(`jar xf "${nativePath}"`, {
+          cwd: nativesDir,
+          timeout: 10000,
+        });
+        // Remove excluded files
+        for (const ex of exclude) {
+          const exPath = path.join(nativesDir, ex);
+          if (fs.existsSync(exPath)) {
+            fs.rmSync(exPath, { recursive: true, force: true });
+          }
+        }
+      } catch {
+        // jar command failed — skip, game may still work
+      }
+    }
+  }
+}
+
 export async function buildLaunchCommand(opts: LaunchOptions): Promise<string[]> {
   const chain = await resolveVersionChain(opts.versionId);
   const rootDetail = chain[0];
+
+  // Extract native libraries for all versions
+  const nativesDir = path.join(getVersionDir(opts.versionId), 'natives');
+  await extractNatives(chain, nativesDir);
 
   // Find Java
   let javaPath: string;
@@ -181,13 +243,25 @@ export async function buildLaunchCommand(opts: LaunchOptions): Promise<string[]>
 
   // Collect JVM arguments from version details
   const allJvmArgs: string[] = [];
+  let isPre113 = false;
   for (const detail of chain) {
     if (detail.arguments?.jvm) {
       allJvmArgs.push(...getArguments(detail.arguments.jvm));
     } else if (!detail.arguments?.jvm && detail.minecraftArguments) {
-      // Pre-1.13 uses different format
+      // Pre-1.13 uses different format — add standard JVM args
+      isPre113 = true;
       allJvmArgs.push('-cp', '${classpath}');
     }
+  }
+
+  // macOS requires -XstartOnFirstThread for LWJGL/awt to work
+  if (process.platform === 'darwin' && !allJvmArgs.includes('-XstartOnFirstThread')) {
+    allJvmArgs.unshift('-XstartOnFirstThread');
+  }
+
+  // Pre-1.13 versions don't have arguments.jvm, so we must add natives path manually
+  if (isPre113 && !allJvmArgs.some(a => a.includes('java.library.path') || a.includes('natives_directory'))) {
+    allJvmArgs.splice(allJvmArgs.indexOf('-cp'), 0, `-Djava.library.path=\${natives_directory}`);
   }
 
   // Build classpath
@@ -210,8 +284,8 @@ export async function buildLaunchCommand(opts: LaunchOptions): Promise<string[]>
   // Replace variables in JVM args
   const resolvedJvmArgs = allJvmArgs.map(arg =>
     arg.replace(/\$\{classpath\}/g, classpathStr)
-      .replace(/\$\{natives_directory\}/g, path.join(getVersionDir(opts.versionId), 'natives'))
-      .replace(/\$\{launcher_name\}/g, 'terminal-craft-launcher')
+      .replace(/\$\{natives_directory\}/g, nativesDir)
+      .replace(/\$\{launcher_name\}/g, 'xenos-launcher')
       .replace(/\$\{launcher_version\}/g, '0.1')
   );
 
@@ -268,7 +342,20 @@ export async function buildLaunchCommand(opts: LaunchOptions): Promise<string[]>
   }
 
   // Build full command
-  const mainClass = chain[0].mainClass;
+  // Find mainClass - search chain for fallback (e.g. inheritsFrom may have it)
+  let mainClass = chain[0].mainClass;
+  if (!mainClass) {
+    for (const detail of chain) {
+      if (detail.mainClass) {
+        mainClass = detail.mainClass;
+        break;
+      }
+    }
+  }
+  if (!mainClass) {
+    throw new Error(`Cannot launch ${opts.versionId}: mainClass not found. This version may not be a Java-based game and cannot be launched.`);
+  }
+
   const command = [
     javaPath,
     ...jvmArgs,
@@ -287,7 +374,7 @@ export async function launchGame(opts: LaunchOptions): Promise<{
   const gameDir = opts.gameDir;
   const usedJavaPath = command[0];
 
-  const child = require('child_process').spawn(command[0], command.slice(1), {
+  const child = child_process.spawn(command[0], command.slice(1), {
     cwd: gameDir,
     env: {
       ...process.env,
@@ -318,12 +405,12 @@ export async function launchGame(opts: LaunchOptions): Promise<{
       try {
         const platform = os.platform();
         if (platform === 'darwin') {
-          require('child_process').exec(
+          child_process.exec(
             `osascript -e 'tell application "System Events" to set frontmost of every process whose unix id is ${child.pid} to true'`,
             (err: any) => { /* ignore */ }
           );
         } else if (platform === 'linux') {
-          require('child_process').exec(
+          child_process.exec(
             `xdotool search --pid ${child.pid} windowactivate 2>/dev/null`,
             (err: any) => { /* ignore */ }
           );

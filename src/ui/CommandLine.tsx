@@ -1,22 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { processManager, RunningGame } from '../core/processManager.js';
+import { processManager } from '../core/processManager.js';
 import { downloadJdk } from '../java/downloader.js';
 import { downloadVersionFiles } from '../download/downloader.js';
+import { undoDeleteInstance, listInstances } from '../core/instance.js';
+import { PATHS } from '../store/paths.js';
 import { t } from '../i18n/index.js';
+import * as child_process from 'child_process';
 
 interface Props {
   language: string;
   onExit: () => void;
+  onLaunch: (instanceId: string, accountId: string) => void;
+  onQuit: (killAll?: boolean, killBesidesInstance?: string) => void;
 }
 
-const CommandLine: React.FC<Props> = ({ language, onExit }) => {
+const CommandLine: React.FC<Props> = ({ language, onExit, onLaunch, onQuit }) => {
   const [input, setInput] = useState('');
   const [output, setOutput] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   const addOutput = (line: string) => {
     setOutput(prev => [...prev.slice(-50), line]);
+  };
+
+  const openFolder = (dir: string) => {
+    const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
+    child_process.exec(`${cmd} "${dir}"`);
   };
 
   const executeCommand = async (cmd: string) => {
@@ -35,6 +45,82 @@ const CommandLine: React.FC<Props> = ({ language, onExit }) => {
       return;
     }
 
+    // //undodelete
+    if (trimmed === 'undodelete') {
+      const restored = undoDeleteInstance();
+      if (restored) {
+        addOutput(`${t('cmd.undeleted', language)}: ${restored.name}`);
+      } else {
+        addOutput(t('cmd.noUndo', language));
+      }
+      return;
+    }
+
+    // //launch <instance name>
+    const launchMatch = trimmed.match(/^launch\s+(.+)$/i);
+    if (launchMatch) {
+      const name = launchMatch[1].trim();
+      const instances = listInstances();
+      const inst = instances.find(i => i.name === name);
+      if (!inst) {
+        addOutput(`${t('cmd.notFound', language)}: ${name}`);
+        return;
+      }
+      addOutput(`${t('cmd.launching', language)}: ${inst.name}`);
+      onLaunch(inst.id, '');
+      return;
+    }
+
+    // //kill (no args = kill all)
+    if (trimmed === 'kill') {
+      const killed = processManager.killAll();
+      addOutput(`${t('cmd.killedAll', language)}: ${killed}`);
+      return;
+    }
+
+    // //quit
+    if (trimmed === 'quit') {
+      onQuit(false);
+      return;
+    }
+
+    // //quit --kill
+    if (trimmed === 'quit --kill') {
+      onQuit(true);
+      return;
+    }
+
+    // //quit --killbesides <instance name>
+    const quitKillBesidesMatch = trimmed.match(/^quit\s+--killbesides\s+(.+)$/i);
+    if (quitKillBesidesMatch) {
+      const instanceName = quitKillBesidesMatch[1].trim();
+      onQuit(true, instanceName);
+      return;
+    }
+
+    // //file (no args = open instances parent dir)
+    if (trimmed === 'file') {
+      openFolder(PATHS.instances);
+      addOutput(`${t('cmd.openedFolder', language)}: ${PATHS.instances}`);
+      return;
+    }
+
+    // //file <instance name>
+    const fileMatch = trimmed.match(/^file\s+(.+)$/i);
+    if (fileMatch) {
+      const name = fileMatch[1].trim();
+      const instances = listInstances();
+      const inst = instances.find(i => i.name === name);
+      if (!inst) {
+        addOutput(`${t('cmd.notFound', language)}: ${name}`);
+        return;
+      }
+      openFolder(inst.gameDir);
+      addOutput(`${t('cmd.openedFolder', language)}: ${inst.gameDir}`);
+      return;
+    }
+
+    // //running
     if (trimmed === 'running') {
       const games = processManager.list();
       if (games.length === 0) {
@@ -48,37 +134,6 @@ const CommandLine: React.FC<Props> = ({ language, onExit }) => {
       return;
     }
 
-    // //kill <pid|name|version>
-    const killMatch = trimmed.match(/^kill\s+(.+)$/);
-    if (killMatch) {
-      const target = killMatch[1].trim();
-      const pidNum = parseInt(target);
-
-      if (!isNaN(pidNum)) {
-        const game = processManager.findByPid(pidNum);
-        if (game && processManager.killByPid(pidNum)) {
-          addOutput(`${t('cmd.killed', language)}: PID ${pidNum} (${game.instanceName})`);
-        } else {
-          addOutput(`${t('cmd.notFound', language)}: PID ${pidNum}`);
-        }
-      } else {
-        // Try by instance name first
-        let killed = processManager.killByName(target);
-        if (killed > 0) {
-          addOutput(`${t('cmd.killed', language)}: ${killed} ${target}`);
-        } else {
-          // Try by version
-          killed = processManager.killByVersion(target);
-          if (killed > 0) {
-            addOutput(`${t('cmd.killed', language)}: ${killed} x ${target}`);
-          } else {
-            addOutput(`${t('cmd.notFound', language)}: ${target}`);
-          }
-        }
-      }
-      return;
-    }
-
     // //download jdk <version>
     const dlJdkMatch = trimmed.match(/^download\s+jdk\s+(\d+)$/i);
     if (dlJdkMatch) {
@@ -86,9 +141,7 @@ const CommandLine: React.FC<Props> = ({ language, onExit }) => {
       setBusy(true);
       try {
         addOutput(`${t('cmd.downloading', language)} JDK ${version}...`);
-        await downloadJdk(version, 'azul', (p) => {
-          // Minimal progress feedback
-        });
+        await downloadJdk(version, 'azul', () => {});
         addOutput(`JDK ${version} ${t('common.success', language)}`);
       } catch (err: any) {
         addOutput(`${t('common.error', language)}: ${err.message}`);
@@ -104,9 +157,7 @@ const CommandLine: React.FC<Props> = ({ language, onExit }) => {
       setBusy(true);
       try {
         addOutput(`${t('cmd.downloading', language)} ${version}...`);
-        await downloadVersionFiles(version, (p) => {
-          // Minimal progress feedback
-        });
+        await downloadVersionFiles(version, () => {});
         addOutput(`${version} ${t('common.success', language)}`);
       } catch (err: any) {
         addOutput(`${t('common.error', language)}: ${err.message}`);

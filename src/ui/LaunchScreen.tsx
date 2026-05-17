@@ -9,7 +9,7 @@ import { loadAccounts, loadConfig, saveConfig } from '../store/config.js';
 import { findBestJava, detectJavaInstallations } from '../java/detector.js';
 import { getRecommendedJavaVersion } from '../java/versions.js';
 import { downloadJdk } from '../java/downloader.js';
-import { downloadVersionFiles } from '../download/downloader.js';
+import { downloadVersionFiles, DownloadProgress } from '../download/downloader.js';
 import { t } from '../i18n/index.js';
 
 interface Props {
@@ -27,6 +27,7 @@ const LaunchScreen: React.FC<Props> = ({ state, instanceId, accountId, onBack })
   const [error, setError] = useState('');
   const [gamePid, setGamePid] = useState<number | null>(null);
   const [exitCode, setExitCode] = useState<number | null>(null);
+  const [overallProgress, setOverallProgress] = useState<DownloadProgress | null>(null);
 
   const instance = state.instances.find(i => i.id === instanceId);
   const account = state.accounts.find(a => a.id === accountId);
@@ -83,8 +84,9 @@ const LaunchScreen: React.FC<Props> = ({ state, instanceId, accountId, onBack })
 
       // Download version files if needed
       try {
-        await downloadVersionFiles(instance.versionId, (p: any) => {
-          setProgress(`${t('launch.downloadingGame', lang)} ${p.fileName}: ${p.percentage}%`);
+        await downloadVersionFiles(instance.versionId, (p: DownloadProgress) => {
+          setOverallProgress(p);
+          setProgress(`${p.fileName}: ${p.percentage}%`);
         });
       } catch (downloadErr: any) {
         setError(`Failed to download game files: ${downloadErr.message}`);
@@ -173,9 +175,24 @@ const LaunchScreen: React.FC<Props> = ({ state, instanceId, accountId, onBack })
     }
   };
 
+  const renderProgressBar = (pct: number, width: number = 30) => {
+    const filled = Math.round((pct / 100) * width);
+    const empty = width - filled;
+    const bar = '█'.repeat(filled) + '░'.repeat(empty);
+    return bar;
+  };
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  };
+
   return (
     <Box flexDirection="column">
       <Text color="cyan" bold>{t('launch.title', lang)}</Text>
+      <Text color="green">{t('common.navHint', lang)}</Text>
       <Box marginTop={1} flexDirection="column">
         <Box>
           <Text color="white">{t('launch.instance', lang)}: </Text>
@@ -195,6 +212,20 @@ const LaunchScreen: React.FC<Props> = ({ state, instanceId, accountId, onBack })
         <Text color={phase === 'done' || phase === 'error' ? 'red' : 'green'} bold>{getPhaseText()}</Text>
       </Box>
       {progress && <Text color="gray">{progress}</Text>}
+      {phase === 'downloading-game' && overallProgress && (
+        <Box flexDirection="column" marginTop={1}>
+          <Box>
+            <Text color="cyan" bold>{t('launch.totalProgress', lang)} </Text>
+            <Text color="green">{renderProgressBar(overallProgress.overallPercentage)} </Text>
+            <Text color="yellow" bold>{overallProgress.overallPercentage}%</Text>
+          </Box>
+          <Box>
+            <Text color="gray">
+              {overallProgress.completedTasks}/{overallProgress.totalTasks} {t('launch.files', lang)}  |  {formatBytes(overallProgress.downloadedBytesAll)}/{formatBytes(overallProgress.totalBytesAll)}
+            </Text>
+          </Box>
+        </Box>
+      )}
       {gamePid && <Text color="gray">PID: {gamePid}</Text>}
       {error && (
         <Box marginTop={1} flexDirection="column">

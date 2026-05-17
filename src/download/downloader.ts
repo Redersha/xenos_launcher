@@ -24,6 +24,11 @@ export interface DownloadProgress {
   percentage: number;
   speed: number; // bytes per second
   eta: number; // seconds
+  // Overall progress
+  completedTasks: number;
+  totalBytesAll: number;
+  downloadedBytesAll: number;
+  overallPercentage: number;
 }
 
 export async function downloadWithProgress(
@@ -35,6 +40,14 @@ export async function downloadWithProgress(
   let failed = 0;
   const errors: Error[] = [];
   let taskIndex = 0;
+  let completedTasks = 0;
+
+  // Pre-calculate total bytes from all tasks
+  const totalBytesAll = tasks.reduce((sum, t) => sum + (t.size || 0), 0);
+  let downloadedBytesAll = 0;
+
+  // Track per-file downloaded bytes for overall calculation
+  const fileDownloaded: number[] = new Array(tasks.length).fill(0);
 
   const startTime = Date.now();
 
@@ -49,9 +62,54 @@ export async function downloadWithProgress(
           if (task.sha1) {
             const existingSha1 = await computeSha1(task.dest);
             if (existingSha1 === task.sha1) {
+              completedTasks++;
+              // Count existing file size as already downloaded
+              const existingSize = fs.statSync(task.dest).size;
+              fileDownloaded[currentIndex] = existingSize;
+              downloadedBytesAll += existingSize;
+              if (onProgress) {
+                const elapsed = (Date.now() - startTime) / 1000;
+                const speed = elapsed > 0 ? downloadedBytesAll / elapsed : 0;
+                onProgress({
+                  taskId: currentIndex,
+                  totalTasks: tasks.length,
+                  fileName: task.name || path.basename(task.dest),
+                  bytesDownloaded: existingSize,
+                  totalBytes: existingSize,
+                  percentage: 100,
+                  speed,
+                  eta: 0,
+                  completedTasks,
+                  totalBytesAll,
+                  downloadedBytesAll,
+                  overallPercentage: totalBytesAll > 0 ? Math.round((downloadedBytesAll / totalBytesAll) * 100) : Math.round((completedTasks / tasks.length) * 100),
+                });
+              }
               continue; // Skip, already downloaded
             }
           } else if (task.size && fs.statSync(task.dest).size === task.size) {
+            completedTasks++;
+            const existingSize = fs.statSync(task.dest).size;
+            fileDownloaded[currentIndex] = existingSize;
+            downloadedBytesAll += existingSize;
+            if (onProgress) {
+              const elapsed = (Date.now() - startTime) / 1000;
+              const speed = elapsed > 0 ? downloadedBytesAll / elapsed : 0;
+              onProgress({
+                taskId: currentIndex,
+                totalTasks: tasks.length,
+                fileName: task.name || path.basename(task.dest),
+                bytesDownloaded: existingSize,
+                totalBytes: existingSize,
+                percentage: 100,
+                speed,
+                eta: 0,
+                completedTasks,
+                totalBytesAll,
+                downloadedBytesAll,
+                overallPercentage: totalBytesAll > 0 ? Math.round((downloadedBytesAll / totalBytesAll) * 100) : Math.round((completedTasks / tasks.length) * 100),
+              });
+            }
             continue; // Skip, size matches
           }
         }
@@ -60,7 +118,7 @@ export async function downloadWithProgress(
         await mkdirp(path.dirname(task.dest));
 
         // Download the file
-        await downloadFile(task);
+        await downloadFile(task, currentIndex);
 
         // Verify SHA1 if provided
         if (task.sha1) {
@@ -71,6 +129,7 @@ export async function downloadWithProgress(
           }
         }
 
+        completedTasks++;
         succeeded++;
       } catch (error) {
         failed++;
@@ -79,7 +138,7 @@ export async function downloadWithProgress(
     }
   }
 
-  async function downloadFile(task: DownloadTask): Promise<void> {
+  async function downloadFile(task: DownloadTask, taskIdx: number): Promise<void> {
     const tmpPath = task.dest + '.downloading';
     let lastProgress = 0;
     let lastProgressTime = Date.now();
@@ -98,6 +157,7 @@ export async function downloadWithProgress(
       await new Promise<void>((resolve, reject) => {
         resp.data.on('data', (chunk: Buffer) => {
           downloaded += chunk.length;
+          downloadedBytesAll += chunk.length;
 
           if (onProgress) {
             const now = Date.now();
@@ -105,7 +165,7 @@ export async function downloadWithProgress(
             const speed = elapsed > 0 ? (downloaded - lastProgress) / elapsed : 0;
 
             onProgress({
-              taskId: taskIndex,
+              taskId: taskIdx,
               totalTasks: tasks.length,
               fileName: task.name || path.basename(task.dest),
               bytesDownloaded: downloaded,
@@ -113,6 +173,10 @@ export async function downloadWithProgress(
               percentage: total > 0 ? Math.round((downloaded / total) * 100) : 0,
               speed,
               eta: speed > 0 ? Math.round((total - downloaded) / speed) : 0,
+              completedTasks,
+              totalBytesAll,
+              downloadedBytesAll,
+              overallPercentage: totalBytesAll > 0 ? Math.round((downloadedBytesAll / totalBytesAll) * 100) : Math.round((completedTasks / tasks.length) * 100),
             });
 
             lastProgress = downloaded;
@@ -186,6 +250,19 @@ export async function downloadVersionFiles(
         size: lib.downloads.artifact.size,
         name: lib.name,
       });
+    }
+    // Native classifiers (e.g. lwjgl-platform, jinput-platform)
+    if (lib.downloads?.classifiers) {
+      for (const [classifier, download] of Object.entries(lib.downloads.classifiers)) {
+        const dl = download as { url: string; path: string; sha1: string; size: number };
+        tasks.push({
+          url: dl.url,
+          dest: getLibraryPath(dl.path),
+          sha1: dl.sha1,
+          size: dl.size,
+          name: `${lib.name} (${classifier})`,
+        });
+      }
     }
   }
 

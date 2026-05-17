@@ -27,10 +27,9 @@ export interface JdkVersionMapping {
 }
 
 export const JDK_VERSION_MAPPINGS: JdkVersionMapping[] = [
-  { minMcVersion: '1.12', maxMcVersion: '1.16.5', minJava: 8, recommendedJava: 8, maxJava: 11 },
-  { minMcVersion: '1.17', maxMcVersion: '1.17', minJava: 16, recommendedJava: 16, maxJava: 17 },
-  { minMcVersion: '1.17.1', maxMcVersion: '1.17.1', minJava: 17, recommendedJava: 17, maxJava: 21 },
-  { minMcVersion: '1.18', maxMcVersion: '1.20.4', minJava: 17, recommendedJava: 17, maxJava: 21 },
+  { minMcVersion: '0.0', maxMcVersion: '1.11', minJava: 8, recommendedJava: 8, maxJava: 8 },
+  { minMcVersion: '1.12', maxMcVersion: '1.16.5', minJava: 8, recommendedJava: 11, maxJava: 11 },
+  { minMcVersion: '1.17', maxMcVersion: '1.20.4', minJava: 16, recommendedJava: 17, maxJava: 21 },
   { minMcVersion: '1.20.5', maxMcVersion: '1.21.4', minJava: 21, recommendedJava: 21, maxJava: 23 },
-  { minMcVersion: '1.21.5', maxMcVersion: '99.99', minJava: 21, recommendedJava: 21, maxJava: 24 },
+  { minMcVersion: '1.21.5', maxMcVersion: '--', minJava: 21, recommendedJava: 21, maxJava: 24 },
 ];

@@ -12,7 +12,7 @@ const translations: Record<string, Record<string, string>> = {
     'menu.accounts.desc': '管理离线/Microsoft/Yggdrasil账户',
     'menu.versions': '版本',
     'menu.versions.desc': '下载和管理Minecraft版本',
-    'menu.java': 'Java运行时',
+    'menu.java': 'JDK 管理',
     'menu.java.desc': '管理和下载JDK安装',
     'menu.settings': '配置',
     'menu.settings.desc': '修改启动器配置',
@@ -29,6 +29,7 @@ const translations: Record<string, Record<string, string>> = {
     'instances.new': '创建新实例',
     'instances.name': '名称',
     'instances.version': '版本',
+    'instances.selectVersion': '选择版本',
     'instances.selectAccount': '选择账户',
     'instances.noAccount': '没有可用账户，请先添加账户。',
     'instances.importTitle': '导入外部实例',
@@ -41,7 +42,9 @@ const translations: Record<string, Record<string, string>> = {
     'instances.created': '已创建实例',
     'instances.versionLabel': '版本',
     'instances.dirLabel': '目录',
-    'instances.actions': '[n] 新建  [i] 导入  [d] 删除  [Enter] 启动  [Esc] 返回',
+    'instances.openFolder': '已打开文件夹',
+    'instances.confirmDelete': '⚠ 确认删除此实例？[y] 确认  [n/Esc] 取消',
+    'instances.actions': '[n] 新建(选择版本)  [i] 导入  [f] 打开文件夹  [d] 删除  [Enter] 启动  [Esc] 返回',
 
     // Account Manager
     'accounts.title': '账户',
@@ -69,14 +72,18 @@ const translations: Record<string, Record<string, string>> = {
     'versions.navigate': '↑↓ 导航 | ←→ 翻页 | Enter 选择 | Esc 返回',
 
     // Java Manager
-    'java.title': 'Java运行时管理',
+    'java.title': 'JDK 管理',
     'java.scanning': '扫描Java安装...',
     'java.notFound': '未找到Java安装。',
     'java.installHint': '请安装JDK或使用自动下载。',
     'java.versionMappings': 'Java版本映射',
     'java.recommended': '推荐',
     'java.managed': '托管',
-    'java.actions': '[r] 刷新  [m] 版本映射  [Esc] 返回',
+    'java.actions': '[r] 刷新  [m] 查看 Minecraft 版本对应的 JDK 版本  [d] 删除托管JDK  [Esc] 返回',
+    'java.deleted': '已删除JDK',
+    'java.deleteFailed': '删除失败',
+    'java.deleteNotManaged': '只能删除[托管]的JDK',
+    'java.confirmDelete': '⚠ 确认删除此JDK？[y] 确认  [n/Esc] 取消',
 
     // Launch Screen
     'launch.title': '启动游戏',
@@ -93,7 +100,9 @@ const translations: Record<string, Record<string, string>> = {
     'launch.checkingJava': '检查Java运行时...',
     'launch.checkingFiles': '检查游戏文件...',
     'launch.buildingCommand': '构建启动命令...',
-    'launch.gameLaunched': '游戏已启动！',
+    'launch.gameLaunched': '游戏已启动! 如果没有看到游戏窗口则稍等一会l',
+    'launch.totalProgress': '总进度',
+    'launch.files': '个文件',
 
     // Settings
     'settings.title': '配置',
@@ -114,12 +123,17 @@ const translations: Record<string, Record<string, string>> = {
     // Command Line
     'cmd.prompt': '命令',
     'cmd.help': '可用命令：',
-    'cmd.helpList': '  //help        显示帮助\n  //exit        退出命令行\n  //running     显示运行中的实例\n  //kill <pid>  结束进程(仅限游戏进程)\n  //kill <名称> 按实例名结束进程\n  //kill <版本> 结束该版本的所有进程\n  //download jdk <版本>   下载JDK\n  //download game <版本>  下载游戏',
+    'cmd.helpList': '  //help                      显示帮助\n  //exit                      退出命令行\n  //running                   显示运行中的实例\n  //undodelete                撤销一次删除操作\n  //launch <实例名字>         启动游戏\n  //kill                      结束所有游戏\n  //quit                      退出启动器\n  //quit --kill               退出启动器并关闭所有进程\n  //quit --killbesides <名字> 退出并关闭除指定实例以外的所有进程\n  //file                      打开实例目录的上一层\n  //file <实例名字>            打开该实例的游戏文件夹\n  //download jdk <版本>       下载JDK\n  //download game <版本>      下载游戏',
     'cmd.unknown': '未知命令。输入 //help 查看帮助。',
     'cmd.running': '运行中的实例',
     'cmd.noRunning': '没有运行中的实例',
     'cmd.killed': '已终止进程',
-    'cmd.notFound': '未找到进程',
+    'cmd.killedAll': '已终止所有进程',
+    'cmd.notFound': '未找到',
+    'cmd.noUndo': '没有可撤销的删除操作',
+    'cmd.undeleted': '已撤销删除',
+    'cmd.launching': '正在启动',
+    'cmd.openedFolder': '已打开文件夹',
     'cmd.downloading': '下载中...',
     'cmd.hint': '按 // 进入命令行',
 
@@ -129,6 +143,16 @@ const translations: Record<string, Record<string, string>> = {
     'common.confirm': '确认',
     'common.error': '错误',
     'common.success': '成功',
+    'common.navHint': '使用 ↑↓ 导航，Enter 选择，或按数字键。',
+
+    // Update
+    'update.available': '🚀 发现新版本！',
+    'update.newVersion': '最新版本',
+    'update.currentVersion': '当前版本',
+    'update.changelog': '更新日志',
+    'update.prompt': '[y] 打开下载页面  [n] 跳过，继续使用当前版本',
+    'update.opened': '已在浏览器中打开下载页面',
+    'update.skipped': '已跳过更新',
   },
 
   'en': {
@@ -149,7 +173,7 @@ const translations: Record<string, Record<string, string>> = {
     'menu.settings': 'Settings',
     'menu.settings.desc': 'Configure launcher settings',
     'menu.quit': 'Quit',
-    'menu.quit.desc': 'Exit Terminal Craft Launcher',
+    'menu.quit.desc': 'Exit Xenos Launcher',
     'menu.stats.instances': 'Instances',
     'menu.stats.accounts': 'Accounts',
     'menu.lastLaunch': 'Press [l] to launch last game',
@@ -161,6 +185,7 @@ const translations: Record<string, Record<string, string>> = {
     'instances.new': 'Create New Instance',
     'instances.name': 'Name',
     'instances.version': 'Version',
+    'instances.selectVersion': 'Select version',
     'instances.selectAccount': 'Select Account',
     'instances.noAccount': 'No accounts available. Please add an account first.',
     'instances.importTitle': 'Import External Instance',
@@ -173,7 +198,9 @@ const translations: Record<string, Record<string, string>> = {
     'instances.created': 'Created instance',
     'instances.versionLabel': 'Version',
     'instances.dirLabel': 'Dir',
-    'instances.actions': '[n] New  [i] Import  [d] Delete  [Enter] Launch  [Esc] Back',
+    'instances.openFolder': 'Opened folder',
+    'instances.confirmDelete': '⚠ Confirm delete this instance? [y] Confirm  [n/Esc] Cancel',
+    'instances.actions': '[n] New (select version)  [i] Import  [f] Open Folder  [d] Delete  [Enter] Launch  [Esc] Back',
 
     // Account Manager
     'accounts.title': 'Accounts',
@@ -208,7 +235,11 @@ const translations: Record<string, Record<string, string>> = {
     'java.versionMappings': 'Java Version Mappings',
     'java.recommended': 'recommended',
     'java.managed': 'managed',
-    'java.actions': '[r] Refresh  [m] Version Mappings  [Esc] Back',
+    'java.actions': '[r] Refresh  [m] Version Mappings  [d] Delete Managed JDK  [Esc] Back',
+    'java.deleted': 'Deleted JDK',
+    'java.deleteFailed': 'Delete failed',
+    'java.deleteNotManaged': 'Only managed JDKs can be deleted',
+    'java.confirmDelete': '⚠ Confirm delete this JDK? [y] Confirm  [n/Esc] Cancel',
 
     // Launch Screen
     'launch.title': 'Launch Game',
@@ -226,6 +257,8 @@ const translations: Record<string, Record<string, string>> = {
     'launch.checkingFiles': 'Checking game files...',
     'launch.buildingCommand': 'Building launch command...',
     'launch.gameLaunched': 'Game launched!',
+    'launch.totalProgress': 'Total',
+    'launch.files': 'files',
 
     // Settings
     'settings.title': 'Settings',
@@ -246,12 +279,17 @@ const translations: Record<string, Record<string, string>> = {
     // Command Line
     'cmd.prompt': 'Command',
     'cmd.help': 'Available commands:',
-    'cmd.helpList': '  //help              Show help\n  //exit              Exit command line\n  //running           Show running instances\n  //kill <pid>        Kill process (game only)\n  //kill <name>       Kill by instance name\n  //kill <version>    Kill all instances of a version\n  //download jdk <v>  Download JDK\n  //download game <v> Download game',
+    'cmd.helpList': '  //help                      Show help\n  //exit                      Exit command line\n  //running                   Show running instances\n  //undodelete                Undo last delete\n  //launch <instance>         Launch game\n  //kill                      Kill all games\n  //quit                      Quit launcher\n  //quit --kill               Quit launcher and kill all processes\n  //quit --killbesides <name> Quit and kill all processes except named instance\n  //file                      Open instances parent folder\n  //file <instance>           Open instance game folder\n  //download jdk <v>          Download JDK\n  //download game <v>         Download game',
     'cmd.unknown': 'Unknown command. Type //help for help.',
     'cmd.running': 'Running instances',
     'cmd.noRunning': 'No running instances',
     'cmd.killed': 'Killed process',
-    'cmd.notFound': 'Process not found',
+    'cmd.killedAll': 'Killed all processes',
+    'cmd.notFound': 'Not found',
+    'cmd.noUndo': 'No delete to undo',
+    'cmd.undeleted': 'Undeleted',
+    'cmd.launching': 'Launching',
+    'cmd.openedFolder': 'Opened folder',
     'cmd.downloading': 'Downloading...',
     'cmd.hint': 'Press // to enter command line',
 
@@ -261,6 +299,16 @@ const translations: Record<string, Record<string, string>> = {
     'common.confirm': 'Confirm',
     'common.error': 'Error',
     'common.success': 'Success',
+    'common.navHint': 'Use ↑↓ to navigate, Enter to select, or press number keys.',
+
+    // Update
+    'update.available': '🚀 New version available!',
+    'update.newVersion': 'Latest version',
+    'update.currentVersion': 'Current version',
+    'update.changelog': 'Changelog',
+    'update.prompt': '[y] Open download page  [n] Skip, continue with current version',
+    'update.opened': 'Opened download page in browser',
+    'update.skipped': 'Update skipped',
   },
 };
 

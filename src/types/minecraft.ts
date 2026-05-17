@@ -19,7 +19,7 @@ export interface VersionDetail {
   type: string;
   time: string;
   releaseTime: string;
-  mainClass: string;
+  mainClass?: string;
   minecraftArguments?: string; // pre 1.13
   arguments?: {
     game: ArgumentEntry[];

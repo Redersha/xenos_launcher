@@ -8,7 +8,7 @@
  * Platforms: macos-arm64, macos-x64, win-x64, linux-x64, current
  *
  * Prerequisites:
- *   1. Run `npm run bundle` first to generate dist-bundle/tcl.js
+ *   1. Run `npm run bundle` first to generate dist-bundle/xl.js
  *   2. Node.js 20+ with SEA support
  *   3. npx postject available
  *
@@ -24,7 +24,7 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const BUNDLE_DIR = join(ROOT, 'dist-bundle');
-const BUNDLE_JS = join(BUNDLE_DIR, 'tcl.js');
+const BUNDLE_JS = join(BUNDLE_DIR, 'xl.js');
 const WASM = join(BUNDLE_DIR, 'yoga.wasm');
 const OUT_DIR = join(ROOT, 'dist-pkg');
 
@@ -37,11 +37,11 @@ function getExeName(p) {
   const isWin = p.startsWith('win') || (p === 'current' && getPlatform() === 'win32');
   const ext = isWin ? '.exe' : '';
   const names = {
-    'macos-arm64': `tcl-macos-arm64${ext}`,
-    'macos-x64': `tcl-macos-x64${ext}`,
-    'win-x64': `tcl-win-x64${ext}`,
-    'linux-x64': `tcl-linux-x64${ext}`,
-    'current': `tcl-${getPlatform()}-${getArch()}${ext}`,
+    'macos-arm64': `xl-macos-arm64${ext}`,
+    'macos-x64': `xl-macos-x64${ext}`,
+    'win-x64': `xl-win-x64${ext}`,
+    'linux-x64': `xl-linux-x64${ext}`,
+    'current': `xl-${getPlatform()}-${getArch()}${ext}`,
   };
   return names[p] || names['current'];
 }
@@ -76,9 +76,9 @@ let bundleDir = dirname(process.execPath);
 try {
   const sea = require('node:sea');
   if (sea.isSea()) {
-    const tmpBase = join(tmpdir(), 'terminal-craft-launcher');
+    const tmpBase = join(tmpdir(), 'xenos-launcher');
     mkdirSync(tmpBase, { recursive: true });
-    for (const name of ['tcl.js', 'yoga.wasm']) {
+    for (const name of ['xl.js', 'yoga.wasm']) {
       const assetPath = join(tmpBase, name);
       try {
         const data = sea.getAsset(name, 'utf-8');
@@ -96,7 +96,7 @@ try {
   // Not running as SEA or node:sea not available, use local files
 }
 
-const bundlePath = join(bundleDir, 'tcl.js');
+const bundlePath = join(bundleDir, 'xl.js');
 if (!existsSync(bundlePath)) {
   console.error('Bundle not found at:', bundlePath);
   process.exit(1);
@@ -120,7 +120,7 @@ const seaConfig = {
   useSnapshot: false,
   assets: {
     'yoga.wasm': WASM,
-    'tcl.js': BUNDLE_JS,
+    'xl.js': BUNDLE_JS,
   },
 };
 writeFileSync(seaConfigPath, JSON.stringify(seaConfig, null, 2));

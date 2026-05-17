@@ -2,7 +2,7 @@
 
 ## 项目简介
 
-Terminal Craft Launcher (TCL) — 一个基于终端 TUI 的 Minecraft Java Edition 启动器。
+Xenos Launcher (XL) — 一个基于终端 TUI 的 Minecraft Java Edition 启动器。
 
 ---
 
@@ -11,7 +11,7 @@ Terminal Craft Launcher (TCL) — 一个基于终端 TUI 的 Minecraft Java Edit
 | 目录 | 内容 | 说明 |
 |------|------|------|
 | `dist/` | TypeScript 编译输出（`tsc`） | 开发时使用，不可直接分发 |
-| `dist-bundle/` | esbuild 打包的单文件 | `tcl.js`（约 2.3MB）+ `yoga.wasm`，需 Node.js 运行时 |
+| `dist-bundle/` | esbuild 打包的单文件 | `xl.js`（约 2.3MB）+ `yoga.wasm`，需 Node.js 运行时 |
 | `dist-pkg/` | 最终分发包 | 包含 Node.js 运行时的可分发压缩包 |
 
 ### 分发包结构
@@ -19,9 +19,9 @@ Terminal Craft Launcher (TCL) — 一个基于终端 TUI 的 Minecraft Java Edit
 解压后目录结构：
 
 ```
-terminal-craft-launcher-<平台>-<架构>/
-├── tcl          # 启动脚本（Windows 为 tcl.cmd）
-├── tcl.js       # 应用主程序（esbuild bundle）
+xenos-launcher-<平台>-<架构>/
+├── xl          # 启动脚本（Windows 为 xl.cmd）
+├── xl.js       # 应用主程序（esbuild bundle）
 ├── yoga.wasm    # Ink 布局引擎 WASM 文件
 └── node         # Node.js 运行时（Windows 为 node.exe）
 ```
@@ -30,10 +30,10 @@ terminal-craft-launcher-<平台>-<架构>/
 
 | 平台 | 文件名 |
 |------|--------|
-| macOS Apple Silicon | `terminal-craft-launcher-macos-arm64.tar.gz` |
-| macOS Intel | `terminal-craft-launcher-macos-x64.tar.gz` |
-| Windows | `terminal-craft-launcher-windows-x64.zip` |
-| Linux | `terminal-craft-launcher-linux-x64.tar.gz` |
+| macOS Apple Silicon | `xenos-launcher-macos-arm64.tar.gz` |
+| macOS Intel | `xenos-launcher-macos-x64.tar.gz` |
+| Windows | `xenos-launcher-windows-x64.zip` |
+| Linux | `xenos-launcher-linux-x64.tar.gz` |
 
 ---
 
@@ -51,7 +51,7 @@ npm install
 npm run bundle
 ```
 
-此步骤使用 esbuild 将所有代码打包为 `dist-bundle/tcl.js` 单文件，并复制 `yoga.wasm` 到 `dist-bundle/`。
+此步骤使用 esbuild 将所有代码打包为 `dist-bundle/xl.js` 单文件，并复制 `yoga.wasm` 到 `dist-bundle/`。
 
 ### 3. 生成分发包
 
@@ -79,13 +79,13 @@ npm run pack:all
 
 ```bash
 # 1. 解压
-tar -xzf terminal-craft-launcher-macos-arm64.tar.gz
+tar -xzf xenos-launcher-macos-arm64.tar.gz
 
 # 2. 进入目录
-cd terminal-craft-launcher-macos-arm64
+cd xenos-launcher-macos-arm64
 
 # 3. 运行
-./tcl
+./xl
 ```
 
 ### Windows
@@ -96,7 +96,7 @@ cd terminal-craft-launcher-macos-arm64
 # 2. 进入目录
 
 # 3. 运行
-tcl.cmd
+xl.cmd
 ```
 
 ---
