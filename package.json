@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "bundle": "esbuild src/index.tsx --bundle --platform=node --target=node20 --outfile=dist-bundle/tcl.js --format=esm --alias:react-devtools-core=./shims/react-devtools-core.js --packages=bundle --banner:js='import{createRequire}from\"module\";import{fileURLToPath as __fileURLToPath}from\"url\";import{dirname as __dirname2}from\"path\";const require=createRequire(import.meta.url);const __filename=__fileURLToPath(import.meta.url);const __dirname=__dirname2(__filename);' && cp node_modules/yoga-wasm-web/dist/yoga.wasm dist-bundle/",
+    "bundle": "node scripts/bundle.mjs",
     "pack:macos": "node scripts/pack-dist.mjs macos-arm64",
     "pack:macos-x64": "node scripts/pack-dist.mjs macos-x64",
     "pack:win": "node scripts/pack-dist.mjs win-x64",
