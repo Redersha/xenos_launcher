@@ -13,8 +13,6 @@ jobs:
         include:
           - os: macos-latest
             platform: macos-arm64
-          - os: macos-13
-            platform: macos-x64
           - os: windows-latest
             platform: win-x64
           - os: ubuntu-latest
