@@ -39,8 +39,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: terminal-craft-launcher-${{ matrix.artifact }}
-          path: dist-pkg/terminal-craft-launcher-${{ matrix.artifact }}.*
+          name: xenos-launcher-${{ matrix.artifact }}
+          path: dist-pkg/xenos-launcher-${{ matrix.artifact }}.*
 
   release:
     needs: build
