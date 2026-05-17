@@ -13,10 +13,13 @@ jobs:
         include:
           - os: macos-latest
             platform: macos-arm64
+            artifact: macos-arm64
           - os: windows-latest
             platform: win-x64
+            artifact: windows-x64
           - os: ubuntu-latest
             platform: linux-x64
+            artifact: linux-x64
 
     runs-on: ${{ matrix.os }}
 
