@@ -19,7 +19,7 @@
  */
 
 import { execSync } from 'child_process';
-import { existsSync, copyFileSync, unlinkSync, writeFileSync, mkdirSync, rmSync, renameSync } from 'fs';
+import { existsSync, copyFileSync, unlinkSync, writeFileSync, mkdirSync, rmSync, renameSync, readdirSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -56,6 +56,26 @@ function getDirName(p) {
 function getArchiveExt(p) {
   const info = getTargetInfo(p);
   return info.os === 'win32' ? '.zip' : '.tar.gz';
+}
+
+// Cross-platform directory size calculation
+function getDirSize(dir) {
+  let size = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      size += getDirSize(full);
+    } else {
+      size += statSync(full).size;
+    }
+  }
+  return size;
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
 // Check prerequisites
@@ -148,12 +168,12 @@ const archivePath = join(OUT_DIR, archiveName);
 if (existsSync(archivePath)) unlinkSync(archivePath);
 
 if (targetInfo.os === 'win32') {
-  // Create zip
+  // Use PowerShell to create zip (available on all Windows runners)
+  const psCmd = `Compress-Archive -Path '${pkgDir}\\*' -DestinationPath '${archivePath}' -Force`;
   try {
-    execSync(`cd "${OUT_DIR}" && zip -r "${archiveName}" "${dirName}/"`, { stdio: 'inherit' });
+    execSync(`powershell -Command "${psCmd}"`, { stdio: 'inherit' });
   } catch (e) {
-    console.error('❌ zip failed. Install zip or use a different method.');
-    // Just leave the directory
+    console.error('❌ PowerShell zip failed. The unpacked directory is still available.');
   }
 } else {
   // Create tar.gz
@@ -169,15 +189,13 @@ console.log(`\n✅ Done!`);
 console.log(`   Package directory: ${pkgDir}`);
 console.log(`   Archive: ${archivePath}`);
 
-// Calculate sizes
-try {
-  const duResult = execSync(`du -sh "${pkgDir}" 2>/dev/null`).toString().trim();
-  console.log(`   Package size: ${duResult.split('\t')[0]}`);
-  if (existsSync(archivePath)) {
-    const archiveResult = execSync(`du -sh "${archivePath}" 2>/dev/null`).toString().trim();
-    console.log(`   Archive size: ${archiveResult.split('\t')[0]}`);
-  }
-} catch {}
+// Calculate sizes cross-platform
+const pkgSize = getDirSize(pkgDir);
+console.log(`   Package size: ${formatBytes(pkgSize)}`);
+if (existsSync(archivePath)) {
+  const archiveSize = statSync(archivePath).size;
+  console.log(`   Archive size: ${formatBytes(archiveSize)}`);
+}
 
 console.log(`\n   Usage:`);
 if (targetInfo.os === 'win32') {
