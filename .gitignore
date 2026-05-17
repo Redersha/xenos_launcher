@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dist-bundle/
+dist-pkg/
+*.js.map
+.dts/
+.cache/
+terminal-craft-launcher-*/

@@ -1,0 +1,46 @@
+{
+  "name": "terminal_craft_launcher",
+  "version": "0.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "tcl": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "bundle": "esbuild src/index.tsx --bundle --platform=node --target=node20 --outfile=dist-bundle/tcl.js --format=esm --alias:react-devtools-core=./shims/react-devtools-core.js --packages=bundle --banner:js='import{createRequire}from\"module\";import{fileURLToPath as __fileURLToPath}from\"url\";import{dirname as __dirname2}from\"path\";const require=createRequire(import.meta.url);const __filename=__fileURLToPath(import.meta.url);const __dirname=__dirname2(__filename);' && cp node_modules/yoga-wasm-web/dist/yoga.wasm dist-bundle/",
+    "pack:macos": "node scripts/pack-dist.mjs macos-arm64",
+    "pack:macos-x64": "node scripts/pack-dist.mjs macos-x64",
+    "pack:win": "node scripts/pack-dist.mjs win-x64",
+    "pack:linux": "node scripts/pack-dist.mjs linux-x64",
+    "pack:all": "npm run bundle && npm run pack:macos && npm run pack:macos-x64 && npm run pack:win && npm run pack:linux",
+    "pack:sea": "node scripts/pack-sea.mjs current",
+    "dev": "tsc && node dist/index.js",
+    "dev:watch": "tsc -w & node --watch dist/index.js",
+    "start": "node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "minecraft",
+    "launcher",
+    "terminal",
+    "tui"
+  ],
+  "author": "",
+  "license": "MIT",
+  "description": "A Minecraft JE launcher with terminal TUI",
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "esbuild": "^0.25.12",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^5.2.1",
+    "@types/react": "^18.3.28",
+    "axios": "^1.16.1",
+    "chalk": "^5.6.2",
+    "ink": "^4.4.1",
+    "mkdirp": "^3.0.1",
+    "react": "^18.3.1"
+  }
+}

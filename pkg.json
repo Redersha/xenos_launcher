@@ -1,0 +1,8 @@
+{
+  "pkg": {
+    "assets": [
+      "dist-bundle/yoga.wasm"
+    ],
+    "outputPath": "dist-pkg"
+  }
+}
