@@ -7,7 +7,7 @@ const execAsync = promisify(exec);
 const GITHUB_REPO = 'Redersha/xenos_launcher';
 const GITHUB_API_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
 
-export const CURRENT_VERSION = '0.1';
+export const CURRENT_VERSION = '0.3';
 
 export interface UpdateInfo {
   version: string;
@@ -40,7 +40,7 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
       return {
         version: tag.replace(/^v/, ''),
         htmlUrl: resp.data.html_url as string,
-        body: (resp.data.body || '').slice(0, 500),
+        body: (resp.data.body || '').split('\n')[0].trim().slice(0, 500),
       };
     }
     return null;

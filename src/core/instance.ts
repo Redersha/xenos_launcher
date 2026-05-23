@@ -2,17 +2,39 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { GameInstance, InstanceConfig } from '../types/instance.js';
+import { ModLoaderInfo } from '../types/modloader.js';
 import { getInstanceDir, getInstanceGameDir, PATHS } from '../store/paths.js';
 import { loadInstances, saveInstances, loadInstanceConfig, saveInstanceConfig } from '../store/config.js';
+import { installModLoader, downloadFabricApi } from '../modloader/index.js';
 
 export function createInstance(opts: {
   name: string;
   versionId: string;
+  modLoader?: ModLoaderInfo;
+  loaderVersion?: string;
   javaPath?: string;
   jvmArgs?: string[];
   resolution?: { width: number; height: number };
 }): GameInstance {
-  const id = `instance_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  // Build descriptive folder name: {name}_{versionId}[_{modLoaderType}-{version}]
+  let folderName = `${opts.name}_${opts.versionId}`;
+  if (opts.modLoader) {
+    const loaderVer = opts.modLoader.version || opts.loaderVersion || '';
+    folderName += `_${opts.modLoader.type}${loaderVer ? `-${loaderVer}` : ''}`;
+  }
+  // Sanitize for filesystem compatibility
+  folderName = folderName.replace(/[^a-zA-Z0-9\u4e00-\u9fff_.-]/g, '_');
+
+  // Ensure uniqueness
+  const instancesDir = PATHS.instances;
+  let finalName = folderName;
+  let counter = 1;
+  while (fs.existsSync(path.join(instancesDir, finalName))) {
+    counter++;
+    finalName = `${folderName}_${counter}`;
+  }
+
+  const id = finalName;
   const gameDir = getInstanceGameDir(id);
 
   // Ensure instance directory and standard Minecraft subdirectories exist
@@ -29,6 +51,8 @@ export function createInstance(opts: {
     name: opts.name,
     versionId: opts.versionId,
     gameDir,
+    modLoader: opts.modLoader,
+    loaderVersion: opts.loaderVersion,
     javaPath: opts.javaPath,
     jvmArgs: opts.jvmArgs,
     resolution: opts.resolution,
@@ -50,6 +74,40 @@ export function createInstance(opts: {
   saveInstanceConfig(config);
 
   return instance;
+}
+
+/**
+ * Install mod loader and Fabric API for a newly created instance.
+ * Call this after createInstance() for mod loader instances.
+ */
+export async function installInstanceModLoader(
+  instanceId: string,
+  onProgress?: (msg: string) => void,
+): Promise<void> {
+  const instances = loadInstances();
+  const inst = instances.find(i => i.id === instanceId);
+  if (!inst || !inst.modLoader) return;
+
+  const { type, version } = inst.modLoader;
+
+  // Install the mod loader into versions directory
+  onProgress?.(`Installing ${type} ${version}...`);
+  try {
+    await installModLoader(type, inst.versionId, version, onProgress);
+  } catch (err: any) {
+    onProgress?.(`Warning: Failed to install mod loader: ${err.message}`);
+  }
+
+  // For Fabric, auto-download Fabric API
+  if (type === 'fabric') {
+    onProgress?.('Downloading Fabric API...');
+    try {
+      await downloadFabricApi(inst.versionId, path.join(inst.gameDir, 'mods'));
+      onProgress?.('Fabric API installed.');
+    } catch (err: any) {
+      onProgress?.(`Warning: Failed to download Fabric API: ${err.message}`);
+    }
+  }
 }
 
 // Undo-delete support: store the last deleted instance for one-level undo
@@ -154,7 +212,19 @@ export function importInstance(opts: {
     return null;
   }
 
-  const id = `instance_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  // Build descriptive folder name for imported instances too
+  let folderName = `${opts.name}_${opts.versionId}`;
+  folderName = folderName.replace(/[^a-zA-Z0-9\u4e00-\u9fff_.-]/g, '_');
+
+  const instancesDir = PATHS.instances;
+  let finalName = folderName;
+  let counter = 1;
+  while (fs.existsSync(path.join(instancesDir, finalName))) {
+    counter++;
+    finalName = `${folderName}_${counter}`;
+  }
+
+  const id = finalName;
   const instanceDir = getInstanceDir(id);
 
   // Ensure instance base directory exists

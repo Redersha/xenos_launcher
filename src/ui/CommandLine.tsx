@@ -3,19 +3,21 @@ import { Box, Text, useInput } from 'ink';
 import { processManager } from '../core/processManager.js';
 import { downloadJdk } from '../java/downloader.js';
 import { downloadVersionFiles } from '../download/downloader.js';
-import { undoDeleteInstance, listInstances } from '../core/instance.js';
+import { listInstances } from '../core/instance.js';
+import { searchMods, getProjectVersions, downloadModFile } from '../resources/modrinth.js';
 import { PATHS } from '../store/paths.js';
 import { t } from '../i18n/index.js';
 import * as child_process from 'child_process';
 
 interface Props {
   language: string;
+  currentInstanceId?: string;
   onExit: () => void;
   onLaunch: (instanceId: string, accountId: string) => void;
   onQuit: (killAll?: boolean, killBesidesInstance?: string) => void;
 }
 
-const CommandLine: React.FC<Props> = ({ language, onExit, onLaunch, onQuit }) => {
+const CommandLine: React.FC<Props> = ({ language, currentInstanceId, onExit, onLaunch, onQuit }) => {
   const [input, setInput] = useState('');
   const [output, setOutput] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -42,17 +44,6 @@ const CommandLine: React.FC<Props> = ({ language, onExit, onLaunch, onQuit }) =>
 
     if (trimmed === 'exit') {
       onExit();
-      return;
-    }
-
-    // //undodelete
-    if (trimmed === 'undodelete') {
-      const restored = undoDeleteInstance();
-      if (restored) {
-        addOutput(`${t('cmd.undeleted', language)}: ${restored.name}`);
-      } else {
-        addOutput(t('cmd.noUndo', language));
-      }
       return;
     }
 
@@ -166,6 +157,78 @@ const CommandLine: React.FC<Props> = ({ language, onExit, onLaunch, onQuit }) =>
       return;
     }
 
+    // //download res <mod name> [instance name]
+    const dlResMatch = trimmed.match(/^download\s+res\s+(.+)$/i);
+    if (dlResMatch) {
+      const rest = dlResMatch[1].trim();
+      setBusy(true);
+      try {
+        // Parse mod name and optional instance name
+        const allInstances = listInstances();
+        let modName = rest;
+        let targetInstanceId: string | undefined = currentInstanceId;
+
+        // Check if the rest ends with an instance name
+        for (const inst of allInstances) {
+          if (rest.endsWith(inst.name) && rest.length > inst.name.length) {
+            modName = rest.slice(0, -(inst.name.length)).trim();
+            targetInstanceId = inst.id;
+            break;
+          }
+        }
+
+        if (!targetInstanceId) {
+          addOutput('No target instance. Set a current instance first or specify instance name.');
+          setBusy(false);
+          return;
+        }
+
+        const targetInst = allInstances.find(i => i.id === targetInstanceId);
+        if (!targetInst) {
+          addOutput('Target instance not found.');
+          setBusy(false);
+          return;
+        }
+
+        addOutput(`${t('cmd.searching', language)}: ${modName}...`);
+        const result = await searchMods(modName, {
+          gameVersion: targetInst.versionId,
+          modLoader: targetInst.modLoader?.type,
+          sortBy: 'downloads',
+          limit: 1,
+        });
+
+        if (result.hits.length === 0) {
+          addOutput(`${t('cmd.notFound', language)}: ${modName}`);
+          setBusy(false);
+          return;
+        }
+
+        const project = result.hits[0];
+        addOutput(`${t('cmd.found', language)}: ${project.title} (${project.downloads} downloads)`);
+
+        const versions = await getProjectVersions(project.project_id, {
+          gameVersions: targetInst.versionId ? [targetInst.versionId] : undefined,
+          loaders: targetInst.modLoader?.type ? [targetInst.modLoader.type] : undefined,
+        });
+
+        if (versions.length === 0) {
+          addOutput('No compatible version found for this instance.');
+          setBusy(false);
+          return;
+        }
+
+        const modsDir = `${targetInst.gameDir}/mods`;
+        addOutput(`${t('cmd.downloading', language)} ${versions[0].name}...`);
+        await downloadModFile(versions[0], modsDir);
+        addOutput(`${project.title} ${t('common.success', language)}! → ${modsDir}`);
+      } catch (err: any) {
+        addOutput(`${t('common.error', language)}: ${err.message}`);
+      }
+      setBusy(false);
+      return;
+    }
+
     addOutput(t('cmd.unknown', language));
   };
 
@@ -175,6 +238,11 @@ const CommandLine: React.FC<Props> = ({ language, onExit, onLaunch, onQuit }) =>
       return;
     }
     if (busy) return;
+
+    if (key.tab) {
+      // Tab no longer does completion — ignore
+      return;
+    }
 
     if (key.return) {
       if (input.trim()) {

@@ -9,11 +9,12 @@ interface Props {
   state: AppState;
   onBack: () => void;
   onSelect: (versionId: string) => void;
+  title?: string;
 }
 
 type VersionFilter = 'release' | 'snapshot' | 'all';
 
-const VersionSelector: React.FC<Props> = ({ state, onBack, onSelect }) => {
+const VersionSelector: React.FC<Props> = ({ state, onBack, onSelect, title }) => {
   const [versions, setVersions] = useState<VersionEntry[]>([]);
   const [selected, setSelected] = useState(0);
   const [filter, setFilter] = useState<VersionFilter>('release');
@@ -64,9 +65,9 @@ const VersionSelector: React.FC<Props> = ({ state, onBack, onSelect }) => {
     if (key.return && visibleVersions.length > 0) {
       onSelect(visibleVersions[selected].id);
     }
-    if (input === 'r') { setFilter('release'); }
-    if (input === 's') { setFilter('snapshot'); }
-    if (input === 'a') { setFilter('all'); }
+    if (input === '1') { setFilter('release'); }
+    if (input === '2') { setFilter('snapshot'); }
+    if (input === '3') { setFilter('all'); }
   });
 
   const visibleVersions = versions.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -74,7 +75,7 @@ const VersionSelector: React.FC<Props> = ({ state, onBack, onSelect }) => {
   if (loading) {
     return (
       <Box flexDirection="column">
-        <Text color="cyan" bold>{t('versions.title', lang)}</Text>
+        <Text color="cyan" bold>{title || t('versions.title', lang)}</Text>
         <Text color="yellow">{t('versions.loading', lang)}</Text>
       </Box>
     );
@@ -83,7 +84,7 @@ const VersionSelector: React.FC<Props> = ({ state, onBack, onSelect }) => {
   if (error) {
     return (
       <Box flexDirection="column">
-        <Text color="cyan" bold>{t('versions.title', lang)}</Text>
+        <Text color="cyan" bold>{title || t('versions.title', lang)}</Text>
         <Text color="red">Error: {error}</Text>
         <Text color="gray">Press Esc to go back</Text>
       </Box>
@@ -94,12 +95,12 @@ const VersionSelector: React.FC<Props> = ({ state, onBack, onSelect }) => {
 
   return (
     <Box flexDirection="column">
-      <Text color="cyan" bold>{t('versions.title', lang)}</Text>
+      <Text color="cyan" bold>{title || t('versions.title', lang)}</Text>
       <Text color="green">{t('common.navHint', lang)}</Text>
       <Box marginBottom={1}>
-        <Text color={filter === 'release' ? 'green' : 'gray'}>[r]Release </Text>
-        <Text color={filter === 'snapshot' ? 'green' : 'gray'}>[s]Snapshot </Text>
-        <Text color={filter === 'all' ? 'green' : 'gray'}>[a]All</Text>
+        <Text color={filter === 'release' ? 'green' : 'gray'}>[1]Release </Text>
+        <Text color={filter === 'snapshot' ? 'green' : 'gray'}>[2]Snapshot </Text>
+        <Text color={filter === 'all' ? 'green' : 'gray'}>[3]All</Text>
       </Box>
       <Box flexDirection="column">
         {visibleVersions.map((v, idx) => (

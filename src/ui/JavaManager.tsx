@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
+import { exec } from 'child_process';
 import { AppState } from './App.js';
 import { JavaInstallation } from '../types/java.js';
 import { detectJavaInstallations, deleteManagedJdk } from '../java/detector.js';
+import { downloadJdk } from '../java/downloader.js';
 import { JDK_VERSION_MAPPINGS } from '../types/java.js';
+import { PATHS } from '../store/paths.js';
 import { t } from '../i18n/index.js';
 
 interface Props {
@@ -18,8 +21,25 @@ const JavaManager: React.FC<Props> = ({ state, onBack }) => {
   const [showMappings, setShowMappings] = useState(false);
   const [status, setStatus] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [selectJdkVersion, setSelectJdkVersion] = useState(false);
+  const [selectedJdkVersion, setSelectedJdkVersion] = useState(0);
+  const [downloadProgress, setDownloadProgress] = useState<{ percentage: number; downloaded: number; total: number } | null>(null);
 
   const lang = state.config.language || 'zh-CN';
+
+  const JDK_DOWNLOAD_VERSIONS = [8, 11, 17, 21, 24];
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)}GB`;
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${bytes}B`;
+  };
+
+  const progressBar = (pct: number, width: number = 20): string => {
+    const filled = Math.round((pct / 100) * width);
+    return '█'.repeat(filled) + '░'.repeat(width - filled);
+  };
 
   useEffect(() => {
     detectJavaInstallations().then(results => {
@@ -28,15 +48,45 @@ const JavaManager: React.FC<Props> = ({ state, onBack }) => {
     });
   }, []);
 
-  useInput((input, key) => {
+  useInput(async (input, key) => {
+    if (selectJdkVersion) {
+      if (key.escape) { setSelectJdkVersion(false); return; }
+      if (key.upArrow) setSelectedJdkVersion(prev => (prev - 1 + JDK_DOWNLOAD_VERSIONS.length) % JDK_DOWNLOAD_VERSIONS.length);
+      if (key.downArrow) setSelectedJdkVersion(prev => (prev + 1) % JDK_DOWNLOAD_VERSIONS.length);
+      if (key.return) {
+        const version = JDK_DOWNLOAD_VERSIONS[selectedJdkVersion];
+        setSelectJdkVersion(false);
+        setLoading(true);
+        setDownloadProgress(null);
+        setStatus(`${t('java.downloading', lang)} JDK ${version}...`);
+        try {
+          await downloadJdk(version, 'azul', (progress) => {
+            setDownloadProgress(progress);
+            setStatus(`${t('java.downloading', lang)} JDK ${version}...`);
+          });
+          setStatus(`JDK ${version} ${t('java.downloaded', lang)}`);
+          setDownloadProgress(null);
+          detectJavaInstallations().then(results => {
+            setInstallations(results);
+            setLoading(false);
+          });
+        } catch (err: any) {
+          setStatus(`Error: ${err.message}`);
+          setDownloadProgress(null);
+          setLoading(false);
+        }
+        return;
+      }
+      return;
+    }
     if (key.escape) {
       if (confirmDelete) { setConfirmDelete(false); return; }
       onBack(); return;
     }
     if (key.upArrow) setSelected(prev => (prev - 1 + installations.length) % Math.max(installations.length, 1));
     if (key.downArrow) setSelected(prev => (prev + 1) % Math.max(installations.length, 1));
-    if (input === 'm') setShowMappings(prev => !prev);
-    if (input === 'r') {
+    if (input === 'v') setShowMappings(prev => !prev);
+    if (input === 'x') {
       setLoading(true);
       setStatus('');
       detectJavaInstallations().then(results => {
@@ -44,7 +94,19 @@ const JavaManager: React.FC<Props> = ({ state, onBack }) => {
         setLoading(false);
       });
     }
-    if (input === 'd' && installations.length > 0 && !confirmDelete) {
+    if (input === 'c') {
+      // Open Java folder
+      const javaDir = PATHS.java;
+      const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
+      exec(`${cmd} "${javaDir}"`);
+      setStatus(`Opened: ${javaDir}`);
+    }
+    if (input === 'z') {
+      // Download a JDK — let user select version
+      setSelectJdkVersion(true);
+      setSelectedJdkVersion(2); // default to JDK 21 (index 2)
+    }
+    if ((key.delete || key.backspace) && installations.length > 0 && !confirmDelete) {
       const inst = installations[selected];
       if (inst && inst.isAutoInstalled) {
         setConfirmDelete(true);
@@ -75,6 +137,53 @@ const JavaManager: React.FC<Props> = ({ state, onBack }) => {
     }
   });
 
+  if (selectJdkVersion) {
+    return (
+      <Box flexDirection="column">
+        <Text color="cyan" bold>{t('java.selectVersion', lang)}</Text>
+        <Text color="green">{t('common.navHint', lang)}</Text>
+        <Box marginTop={1} flexDirection="column">
+          {JDK_DOWNLOAD_VERSIONS.map((ver, idx) => (
+            <Box key={ver}>
+              <Text color={idx === selectedJdkVersion ? 'cyan' : 'gray'}>
+                {idx === selectedJdkVersion ? '❯ ' : '  '}
+              </Text>
+              <Text color={idx === selectedJdkVersion ? 'white' : 'gray'} bold={idx === selectedJdkVersion}>
+                JDK {ver}
+              </Text>
+            </Box>
+          ))}
+        </Box>
+        <Box marginTop={1}>
+          <Text color="gray">↑↓ {t('resources.select', lang)}, Enter {t('resources.confirm', lang)}, Esc {t('common.back', lang)}</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (loading && downloadProgress) {
+    // Downloading JDK with progress
+    const bar = progressBar(downloadProgress.percentage);
+    return (
+      <Box flexDirection="column">
+        <Text color="cyan" bold>{t('java.title', lang)}</Text>
+        <Text color="green">{t('common.navHint', lang)}</Text>
+        <Box marginTop={1} flexDirection="column">
+          <Text color="yellow">{status}</Text>
+          <Box marginTop={1}>
+            <Text color="cyan">[{bar}]</Text>
+            <Text color="white"> {downloadProgress.percentage}%</Text>
+          </Box>
+          <Box marginTop={0}>
+            <Text color="gray">
+              {formatBytes(downloadProgress.downloaded)} / {formatBytes(downloadProgress.total)}
+            </Text>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
+
   if (loading) {
     return (
       <Box flexDirection="column">
@@ -100,7 +209,7 @@ const JavaManager: React.FC<Props> = ({ state, onBack }) => {
           ))}
         </Box>
         <Box marginTop={1}>
-          <Text color="gray">Press [m] to toggle mappings, [Esc] back</Text>
+          <Text color="gray">Press [v] to toggle mappings, [Esc] back</Text>
         </Box>
       </Box>
     );
@@ -110,6 +219,9 @@ const JavaManager: React.FC<Props> = ({ state, onBack }) => {
     <Box flexDirection="column">
       <Text color="cyan" bold>{t('java.title', lang)}</Text>
       <Text color="green">{t('common.navHint', lang)}</Text>
+      <Box marginBottom={1} borderStyle="single" borderColor="gray" paddingX={1}>
+        <Text color="gray">{t('java.actions', lang)}</Text>
+      </Box>
       <Box marginTop={1} flexDirection="column">
         {installations.length === 0 ? (
           <Box flexDirection="column">
@@ -136,9 +248,6 @@ const JavaManager: React.FC<Props> = ({ state, onBack }) => {
             </Box>
           ))
         )}
-      </Box>
-      <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={1}>
-        <Text color="gray">{t('java.actions', lang)}</Text>
       </Box>
       {confirmDelete && (
         <Text color="yellow">{t('java.confirmDelete', lang)}</Text>

@@ -1,21 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
-import MainMenu from './MainMenu.js';
-import InstanceManager from './InstanceManager.js';
-import AccountManager from './AccountManager.js';
-import VersionSelector from './VersionSelector.js';
-import JavaManager from './JavaManager.js';
-import LaunchScreen from './LaunchScreen.js';
-import SettingsScreen from './SettingsScreen.js';
-import CommandLine from './CommandLine.js';
 import { ensureDirectories } from '../store/paths.js';
 import { processManager } from '../core/processManager.js';
-import { loadConfig, saveConfig, loadAccounts, loadInstances } from '../store/config.js';
+import { loadConfig, loadAccounts, loadInstances } from '../store/config.js';
 import { AppConfig } from '../store/config.js';
 import { AuthAccount } from '../types/auth.js';
 import { GameInstance } from '../types/instance.js';
 import { checkForUpdate, openInBrowser, UpdateInfo, CURRENT_VERSION } from '../core/updater.js';
 import { t } from '../i18n/index.js';
+
+// Lazy-load screen components to avoid loading all modules at startup
+const MainMenu = React.lazy(() => import('./MainMenu.js'));
+const InstanceManager = React.lazy(() => import('./InstanceManager.js'));
+const AccountManager = React.lazy(() => import('./AccountManager.js'));
+const VersionSelector = React.lazy(() => import('./VersionSelector.js'));
+const JavaManager = React.lazy(() => import('./JavaManager.js'));
+const LaunchScreen = React.lazy(() => import('./LaunchScreen.js'));
+const SettingsScreen = React.lazy(() => import('./SettingsScreen.js'));
+const CommandLine = React.lazy(() => import('./CommandLine.js'));
+const ResourcesBrowser = React.lazy(() => import('./ResourcesBrowser.js'));
 
 export type Screen =
   | 'main'
@@ -24,7 +27,9 @@ export type Screen =
   | 'versions'
   | 'java'
   | 'launch'
-  | 'settings';
+  | 'settings'
+  | 'resources'
+  | 'search';
 
 export interface AppState {
   config: AppConfig;
@@ -32,6 +37,7 @@ export interface AppState {
   instances: GameInstance[];
   selectedInstanceId?: string;
   selectedAccountId?: string;
+  currentInstanceId?: string;
   pendingCreateVersion?: string;
   pendingCreateName?: string;
 }
@@ -57,17 +63,15 @@ const App: React.FC = () => {
     accounts: loadAccounts(),
     instances: loadInstances(),
   });
-  const [ready, setReady] = useState(false);
   const [commandLineActive, setCommandLineActive] = useState(false);
   const [selectingVersionForCreate, setSelectingVersionForCreate] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [updateDismissed, setUpdateDismissed] = useState(false);
   const lastSlashTime = useRef(0);
 
+  // Run directory setup and update check in background — don't block UI
   useEffect(() => {
     ensureDirectories().then(() => {
-      setReady(true);
-      // Check for updates in background
       const config = loadConfig();
       if (config.checkUpdatesOnStart !== false) {
         checkForUpdate().then(info => {
@@ -104,15 +108,6 @@ const App: React.FC = () => {
     }
   });
 
-  if (!ready) {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text color="cyan" bold>Xenos Launcher</Text>
-        <Text color="gray">Initializing...</Text>
-      </Box>
-    );
-  }
-
   const lang = state.config.language || 'zh-CN';
 
   // Update prompt screen
@@ -120,7 +115,7 @@ const App: React.FC = () => {
     return (
       <Box flexDirection="column" padding={1}>
         <Box borderStyle="round" borderColor="cyan" paddingX={1} marginBottom={1}>
-          <Text color="cyan" bold> ⚡ Xenos Launcher | 终端 Minecraft 启动器</Text>
+          <Text color="cyan" bold> Xenos Launcher | 终端 Minecraft 启动器</Text>
           <Text color="gray"> v{CURRENT_VERSION} </Text>
           <Text color="gray">by Redersha</Text>
         </Box>
@@ -218,6 +213,9 @@ const App: React.FC = () => {
               setState(freshState);
               setScreen('launch');
             }}
+            onSetCurrentInstance={(instanceId) => {
+              setState(prev => ({ ...prev, currentInstanceId: instanceId }));
+            }}
             pendingCreateVersion={state.pendingCreateVersion}
             pendingCreateName={state.pendingCreateName}
             onSelectVersion={(draftName) => {
@@ -270,6 +268,20 @@ const App: React.FC = () => {
             onLanguageChange={refreshState}
           />
         );
+      case 'resources':
+        return (
+          <ResourcesBrowser
+            state={state}
+            onBack={() => { refreshState(); setScreen('main'); }}
+            onSetCurrentInstance={(instanceId) => {
+              setState(prev => ({ ...prev, currentInstanceId: instanceId }));
+            }}
+            onInstanceCreated={(instanceId) => {
+              refreshState();
+              setState(prev => ({ ...prev, selectedInstanceId: instanceId }));
+            }}
+          />
+        );
       default:
         return <MainMenu state={state} onNavigate={setScreen} onExit={exit} onLaunchLast={() => {}} />;
     }
@@ -278,11 +290,12 @@ const App: React.FC = () => {
   return (
     <Box flexDirection="column" padding={1}>
       <Box borderStyle="round" borderColor="cyan" paddingX={1} marginBottom={1}>
-        <Text color="cyan" bold> ⚡ Xenos Launcher | 终端 Minecraft 启动器</Text>
-        <Text color="gray"> v{CURRENT_VERSION} </Text>
-        <Text color="gray">by Redersha</Text>
+        <Text color="cyan" bold>Xenos Launcher v{CURRENT_VERSION}</Text>
+        <Text color="gray"> | by Redersha</Text>
       </Box>
-      {renderScreen()}
+      <React.Suspense fallback={<Text color="gray">Loading...</Text>}>
+        {renderScreen()}
+      </React.Suspense>
       {!commandLineActive && (
         <Box marginTop={1}>
           <Text color="gray" dimColor>{lang === 'zh-CN' ? '按 // 进入命令行' : 'Press // for command line'}</Text>

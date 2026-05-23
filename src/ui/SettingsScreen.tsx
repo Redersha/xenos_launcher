@@ -39,6 +39,7 @@ const SettingsScreen: React.FC<Props> = ({ state, onBack, onLanguageChange }) =>
     { key: 'autoDownloadJdk', label: t('settings.autoDownloadJdk', lang), type: 'toggle' },
     { key: 'processPriority', label: t('settings.processPriority', lang), type: 'select', options: PRIORITIES },
     { key: 'autoRamAllocation', label: t('settings.autoRam', lang), type: 'toggle' },
+    { key: 'checkUpdatesOnStart', label: t('settings.checkUpdatesOnStart', lang), type: 'toggle' },
   ];
 
   const cycleValue = (key: string, direction: number) => {
@@ -81,6 +82,10 @@ const SettingsScreen: React.FC<Props> = ({ state, onBack, onLanguageChange }) =>
         (config as any).autoRamAllocation = !(config as any).autoRamAllocation;
         break;
       }
+      case 'checkUpdatesOnStart': {
+        config.checkUpdatesOnStart = !config.checkUpdatesOnStart;
+        break;
+      }
     }
 
     saveConfig(config);
@@ -119,6 +124,9 @@ const SettingsScreen: React.FC<Props> = ({ state, onBack, onLanguageChange }) =>
       case 'autoRamAllocation': {
         const v = (config as any).autoRamAllocation || false;
         return v ? t('settings.on', lang) : t('settings.off', lang);
+      }
+      case 'checkUpdatesOnStart': {
+        return config.checkUpdatesOnStart ? t('settings.on', lang) : t('settings.off', lang);
       }
       default: return '';
     }

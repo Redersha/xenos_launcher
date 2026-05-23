@@ -20,6 +20,7 @@ const MainMenu: React.FC<Props> = ({ state, onNavigate, onExit, onLaunchLast }) 
     { key: '3', screen: 'versions' as Screen, label: t('menu.versions', lang), desc: t('menu.versions.desc', lang) },
     { key: '4', screen: 'java' as Screen, label: t('menu.java', lang), desc: t('menu.java.desc', lang) },
     { key: '5', screen: 'settings' as Screen, label: t('menu.settings', lang), desc: t('menu.settings.desc', lang) },
+    { key: '6', screen: 'resources' as Screen, label: lang === 'zh-CN' ? '游戏资源' : 'Resources', desc: lang === 'zh-CN' ? '浏览和下载模组' : 'Browse and download mods' },
     { key: 'q', screen: null, label: t('menu.quit', lang), desc: t('menu.quit.desc', lang) },
   ];
 
@@ -60,10 +61,18 @@ const MainMenu: React.FC<Props> = ({ state, onNavigate, onExit, onLaunchLast }) 
         }
       }
     }
+
+    if (input === 's' && !key.ctrl && !key.meta) {
+      onNavigate('search');
+    }
   });
 
   const canLaunchLast = state.config.lastPlayedInstanceId &&
     state.instances.find(i => i.id === state.config.lastPlayedInstanceId);
+
+  const currentInstance = state.currentInstanceId
+    ? state.instances.find(i => i.id === state.currentInstanceId)
+    : undefined;
 
   return (
     <Box flexDirection="column">
@@ -101,6 +110,14 @@ const MainMenu: React.FC<Props> = ({ state, onNavigate, onExit, onLaunchLast }) 
         <Text color="white">{t('menu.stats.accounts', lang)}: </Text>
         <Text color="cyan">{state.accounts.length} </Text>
       </Box>
+
+      {currentInstance && (
+        <Box marginTop={1}>
+          <Text color="yellow">{lang === 'zh-CN' ? '当前实例' : 'Current'}: </Text>
+          <Text color="green">{currentInstance.name}</Text>
+          <Text color="gray"> ({currentInstance.versionId}{currentInstance.modLoader ? ` | ${currentInstance.modLoader.type}` : ''})</Text>
+        </Box>
+      )}
 
       {canLaunchLast && (
         <Box marginTop={1}>

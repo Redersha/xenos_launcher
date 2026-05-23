@@ -39,11 +39,15 @@ const AccountManager: React.FC<Props> = ({ state, onBack }) => {
       if (input === '1') { setSubScreen('add-offline'); setOfflineName(''); setInputMode('name'); }
       if (input === '2') { setSubScreen('add-microsoft'); setMsStatus('waiting'); }
       if (input === '3') { setSubScreen('add-yggdrasil'); setYggdrasilEmail(''); setYggdrasilPassword(''); setInputMode('email'); }
-      if (input === 'd' && accounts.length > 0) {
+      if ((key.delete || key.backspace) && accounts.length > 0) {
         const updated = accounts.filter((_, i) => i !== selected);
         saveAccounts(updated);
         setAccounts(updated);
         setSelected(0);
+      }
+      if (key.return && accounts.length > 0) {
+        // Login: go back to main menu with this account selected (implicitly selected)
+        onBack();
       }
     } else if (subScreen === 'add-offline') {
       if (key.escape) { setSubScreen('list'); return; }
@@ -208,6 +212,9 @@ const AccountManager: React.FC<Props> = ({ state, onBack }) => {
     <Box flexDirection="column">
       <Text color="cyan" bold>{t('accounts.title', lang)}</Text>
       <Text color="green">{t('common.navHint', lang)}</Text>
+      <Box marginBottom={1} borderStyle="single" borderColor="gray" paddingX={1}>
+        <Text color="gray">{t('accounts.actions', lang)}</Text>
+      </Box>
       <Box marginTop={1} flexDirection="column">
         {accounts.length === 0 ? (
           <Text color="yellow">{t('accounts.empty', lang)}</Text>
@@ -223,9 +230,6 @@ const AccountManager: React.FC<Props> = ({ state, onBack }) => {
             </Box>
           ))
         )}
-      </Box>
-      <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={1}>
-        <Text color="gray">{t('accounts.actions', lang)}</Text>
       </Box>
       {status && <Text color="green">{status}</Text>}
     </Box>
